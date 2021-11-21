@@ -4,6 +4,17 @@ using UnityEngine;
 public class HexGrid : MonoBehaviour {
     public float m_hexCellRadius;
 
+    public HexCoordinate LocalPositionToCoordinate(Vector3 localPosition) {
+        HexCoordinate coordinate = HexCoordinateExtensions.ToCoordinate(localPosition, m_hexCellRadius);
+        return coordinate;
+    }
+
+    public HexCoordinate WorldPositionToCoordinate(Vector3 worldPosition) {
+        Vector3 localPosition = transform.InverseTransformPoint(worldPosition);
+        HexCoordinate coordinate = LocalPositionToCoordinate(localPosition);
+        return coordinate;
+    }
+
     public Vector3 CellPosition(HexCoordinate cellCoordinate) {
         Vector3 localPosition = cellCoordinate.Position(m_hexCellRadius);
         Vector3 position = transform.TransformPoint(localPosition);
@@ -16,8 +27,8 @@ public class HexGrid : MonoBehaviour {
         return position;
     }
 
-    public IEnumerable<Vector3> EdgeRing(/*HexCoordinate cellCoordinate, */int radius) {
-        foreach (Vector3 localPosition in HexCoordinateExtensions.EdgeRing(radius, m_hexCellRadius)) {
+    public IEnumerable<Vector3> EdgeRing(HexCoordinate cellCoordinate, int radius) {
+        foreach (Vector3 localPosition in cellCoordinate.EdgeRing(radius, m_hexCellRadius)) {
             Vector3 position = transform.TransformPoint(localPosition);
             yield return position;
         }

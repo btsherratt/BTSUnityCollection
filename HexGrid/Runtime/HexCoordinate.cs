@@ -4,6 +4,8 @@ using UnityEngine;
 
 [Serializable]
 public struct HexCoordinate : IEquatable<HexCoordinate> {
+    public static HexCoordinate Zero = new HexCoordinate(0, 0, 0);
+
     public enum Corner {
         N,
         NW,
@@ -46,17 +48,6 @@ public struct HexCoordinate : IEquatable<HexCoordinate> {
         new HexCoordinate( 0,  1, -1),
     };
 
-    public static IEnumerable<HexCoordinate> Ring(int radius) {
-        HexCoordinate coordinate = ms_directions[4] * radius;
-
-        for (int i = 0; i < 6; ++i) {
-            for (int j = 0; j < radius; ++j) {
-                yield return coordinate;
-                coordinate += ms_directions[i];
-            }
-        }
-    }
-
     public int q;
     public int r;
     public int s;
@@ -83,9 +74,19 @@ public struct HexCoordinate : IEquatable<HexCoordinate> {
 }
 
 public static class HexCoordinateExtensions {
+    public static IEnumerable<HexCoordinate> Ring(this HexCoordinate coordinate, int radius) {
+        HexCoordinate offset = HexCoordinate.ms_directions[4] * radius;
 
-    public static IEnumerable<Vector3> EdgeRing(int radius, float size = 1.0f) {
-        IEnumerator<HexCoordinate> hexCoodinateEnumerator = HexCoordinate.Ring(radius).GetEnumerator();
+        for (int i = 0; i < 6; ++i) {
+            for (int j = 0; j < radius; ++j) {
+                HexCoordinate offsetCoordinate = coordinate + offset;
+                yield return offsetCoordinate;
+                offset += HexCoordinate.ms_directions[i];
+            }
+        }
+    }
+    public static IEnumerable<Vector3> EdgeRing(this HexCoordinate centreCoordinate, int radius, float size = 1.0f) {
+        IEnumerator<HexCoordinate> hexCoodinateEnumerator = centreCoordinate.Ring(radius).GetEnumerator();
 
         for (int j = 0; j < radius; ++j) {
             hexCoodinateEnumerator.MoveNext();
