@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: QADNERPortal
-  m_Shader: {fileID: 4800000, guid: ad8c2dd5aabce004183207ab149914ee, type: 3}
+  m_Name: ZClear
+  m_Shader: {fileID: 4800000, guid: 1dbc716b04ef8304997fa06b8d796002, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0

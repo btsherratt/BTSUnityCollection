@@ -1,4 +1,4 @@
-Shader "Unlit/PortalShader" {
+Shader "Hidden/QADNERPortal" {
     Properties {
     }
 
@@ -7,7 +7,7 @@ Shader "Unlit/PortalShader" {
         LOD 100
 
         Pass {
-            Cull Off
+            //Cull Off
             ColorMask 0
             ZWrite Off
 
