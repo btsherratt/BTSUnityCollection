@@ -1,6 +1,7 @@
 Shader "Hidden/QADNERPortalEffect" {
     Properties {
         _MainTex ("Texture", 2D) = "white" {}
+        _PortalID("Portal Identifier", Int) = 1
     }
 
     SubShader {
@@ -10,7 +11,7 @@ Shader "Hidden/QADNERPortalEffect" {
             ZTest Always
 
             Stencil {
-                Ref 1
+                Ref [_PortalID]
                 Comp Equal
             }
 

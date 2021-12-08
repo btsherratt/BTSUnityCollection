@@ -4,7 +4,11 @@ Shader "BTS/ZClear"
     }
 
     SubShader {
-        Tags { "RenderType"="Opaque-100" }
+        Tags {
+            "Queue" = "Background"
+            "RenderType"="Opaque"
+        }
+
         LOD 100
 
         Pass {

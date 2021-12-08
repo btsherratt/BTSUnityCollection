@@ -10,17 +10,25 @@ public class FPSPlayerController : MonoBehaviour {
 
     public bool m_preventFalls;
 
-    CharacterController m_characterController;
+	public bool m_captureMouse;
+	public bool m_allowEscape;
+
+	CharacterController m_characterController;
     Vector2 m_headRotation;
+
+	bool m_mouseCaptured;
 
     void Start() {
         m_characterController = GetComponent<CharacterController>();
         m_headRotation.x = m_head.localRotation.x;
         m_headRotation.y = m_head.localRotation.y;
+
+		if (m_captureMouse) {
+			//CaptureMouse();
+        }
     }
 
-    void FixedUpdate()
-    {
+    void FixedUpdate() {
         Vector3 direction = Vector3.zero;
 
         Vector3 forwardVector = m_head.forward;
@@ -41,10 +49,20 @@ public class FPSPlayerController : MonoBehaviour {
             m_characterController.enabled = true;
         }
 
-        // mouselook
-        m_headRotation.y += Input.GetAxis("Mouse X") * m_lookSensitivity * Time.fixedDeltaTime;
-        m_headRotation.x -= Input.GetAxis("Mouse Y") * m_lookSensitivity * Time.fixedDeltaTime;
-        m_headRotation.x = Mathf.Clamp(m_headRotation.x, -90, 90);
-        m_head.localRotation = Quaternion.Euler(m_headRotation.x, m_headRotation.y, 0f);
+		if (m_captureMouse == false || Cursor.lockState == CursorLockMode.Locked) {
+			m_headRotation.y += Input.GetAxis("Mouse X") * m_lookSensitivity * Time.fixedDeltaTime;
+			m_headRotation.x -= Input.GetAxis("Mouse Y") * m_lookSensitivity * Time.fixedDeltaTime;
+			m_headRotation.x = Mathf.Clamp(m_headRotation.x, -90, 90);
+			m_head.localRotation = Quaternion.Euler(m_headRotation.x, m_headRotation.y, 0f);
+		}
+
+		if (Cursor.lockState != CursorLockMode.Locked && m_captureMouse && Input.GetMouseButtonDown(0)) {
+			CaptureMouse();
+        }
     }
+
+	void CaptureMouse() {
+		Cursor.lockState = CursorLockMode.Locked;
+		Cursor.visible = false;
+	}
 }

@@ -1,5 +1,6 @@
 Shader "Hidden/QADNERPortal" {
     Properties {
+        _PortalID("Portal Identifier", Int) = 1
     }
 
     SubShader {
@@ -12,7 +13,7 @@ Shader "Hidden/QADNERPortal" {
             ZWrite Off
 
             Stencil {
-                Ref 1
+                Ref [_PortalID]
                 Comp Always
                 Pass Replace
             }
