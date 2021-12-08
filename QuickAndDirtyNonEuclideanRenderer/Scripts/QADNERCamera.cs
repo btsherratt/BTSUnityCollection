@@ -57,20 +57,34 @@ public class QADNERCamera : MonoBehaviour {
 
             portal.PortalRenderStart(this);
             m_redrawCamera.CopyFrom(mainCamera);
-            Quaternion inverseQuaternion = Quaternion.Euler(0, 180, 0);
 
+            Quaternion inverseQuaternion = Quaternion.Euler(0, 180, 0);
             Vector3 cameraLocalPosition = portal.transform.InverseTransformPoint(mainCamera.transform.position);
             Vector3 invertedLocalPosition = inverseQuaternion * cameraLocalPosition;
             m_redrawCamera.transform.position = portal.m_linkedPortal.transform.TransformPoint(invertedLocalPosition);
-
             Vector3 cameraLocalForward = portal.transform.InverseTransformDirection(mainCamera.transform.forward);
             Vector3 invertedLocalForward = inverseQuaternion * cameraLocalForward;
             Vector3 invertedForward = portal.m_linkedPortal.transform.TransformDirection(invertedLocalForward);
             m_redrawCamera.transform.rotation = Quaternion.LookRotation(invertedForward);
 
-            //if (portalDetails.bounds.Contains(m_redrawCamera.transform.position) == false) {
-                //m_redrawCamera.nearClipPlane = Vector3.Distance(m_redrawCamera.transform.position, portalDetails.bounds.ClosestPoint(m_redrawCamera.transform.position)) - 10;
-            //}
+            /*if (portalDetails.bounds.Contains(m_redrawCamera.transform.position) == false) {
+                Vector3[] frustumCorners = new Vector3[4];
+                m_redrawCamera.CalculateFrustumCorners(mainCamera.rect, mainCamera.nearClipPlane, Camera.MonoOrStereoscopicEye.Mono, frustumCorners);
+
+                float minDistance = mainCamera.farClipPlane;
+                for (int i = 0; i < frustumCorners.Length; ++i) {
+                    Vector3 worldSpaceCorner = m_redrawCamera.transform.TransformVector(frustumCorners[i]);
+                    Vector3 invertedNearest = portalDetails.portal.transform.TransformPoint(-portalDetails.portal.transform.InverseTransformPoint(worldSpaceCorner));
+                    float distance = Vector3.Distance(worldSpaceCorner, portalDetails.bounds.ClosestPoint(invertedNearest));
+                    minDistance = Mathf.Min(minDistance, distance);
+                }
+
+                m_redrawCamera.nearClipPlane = minDistance;
+            }*/
+
+            /*if (portalDetails.bounds.Contains(m_redrawCamera.transform.position) == false) {
+                m_redrawCamera.nearClipPlane = Vector3.Distance(m_redrawCamera.transform.position, portalDetails.bounds.ClosestPoint(m_redrawCamera.transform.position));
+            }*/
 
             m_redrawCamera.targetTexture = tex;
             m_redrawCamera.cullingMask = (1 << portal.m_linkedPortal.gameObject.layer);

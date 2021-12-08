@@ -12,9 +12,9 @@ Shader "BTS/ZClear"
         LOD 100
 
         Pass {
-            Cull Off
+            Cull Front
             ColorMask 0
-            ZTest Always
+            //ZTest Always
         }
     }
 }

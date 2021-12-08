@@ -7,11 +7,11 @@ public class ReLayer : MonoBehaviour {
     public int m_layer;
 
     void Start() {
-        foreach (Transform t in GetComponentsInChildren<Transform>()) {
+        foreach (Transform t in GetComponentsInChildren<Transform>(true)) {
             t.gameObject.layer = m_layer;
         }
 
-        foreach (Light l in GetComponentsInChildren<Light>()) {
+        foreach (Light l in GetComponentsInChildren<Light>(true)) {
             l.cullingMask = 1 << m_layer;
         }
     }
