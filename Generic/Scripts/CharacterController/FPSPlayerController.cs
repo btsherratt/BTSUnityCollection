@@ -10,10 +10,15 @@ public class FPSPlayerController : MonoBehaviour {
 
     public bool m_preventFalls;
 
+    public FPSControlScheme m_controlScheme;
+
 	public bool m_captureMouse;
 	public bool m_allowEscape;
 
-	CharacterController m_characterController;
+    [Header("Game objects we should activate whilst this is working")]
+    public GameObject[] m_activateOnFocus;
+
+    CharacterController m_characterController;
     Vector2 m_headRotation;
 
 	bool m_mouseCaptured;
@@ -49,24 +54,24 @@ public class FPSPlayerController : MonoBehaviour {
                 m_head.localRotation = Quaternion.Euler(m_headRotation.x, m_headRotation.y, 0f);
                 //m_mousePreviousValues = currentMouseValues;
             //}
+
+            Quaternion correctedForwardQuaternion = Quaternion.Euler(0, m_head.eulerAngles.y, 0);
+
+            Vector3 direction = Vector3.zero;
+            direction += Input.GetKey(m_controlScheme.m_forward) ? Vector3.forward : Vector3.zero;
+            direction += Input.GetKey(m_controlScheme.m_backward) ? Vector3.back : Vector3.zero;
+            direction += Input.GetKey(m_controlScheme.m_left) ? Vector3.left : Vector3.zero;
+            direction += Input.GetKey(m_controlScheme.m_right) ? Vector3.right : Vector3.zero;
+
+            m_characterController.Move(correctedForwardQuaternion * direction.normalized * m_moveSpeed * Time.deltaTime);
         }
 
-        Quaternion correctedForwardQuaternion = Quaternion.Euler(0, m_head.eulerAngles.y, 0);
-
-        Vector3 direction = Vector3.zero;
-        direction += Input.GetKey(KeyCode.W) ? Vector3.forward : Vector3.zero;
-        direction += Input.GetKey(KeyCode.S) ? Vector3.back : Vector3.zero;
-        direction += Input.GetKey(KeyCode.A) ? Vector3.left : Vector3.zero;
-        direction += Input.GetKey(KeyCode.D) ? Vector3.right : Vector3.zero;
-
-        Vector3 previousPosition = transform.position;
-        m_characterController.Move(correctedForwardQuaternion * direction.normalized * m_moveSpeed * Time.deltaTime);
-
-        if (m_preventFalls && m_characterController.isGrounded == false) {
-            m_characterController.enabled = false;
-            transform.position = previousPosition;
-            m_characterController.enabled = true;
-        }
+        //if (m_preventFalls && m_characterController.isGrounded == false) {
+            //Vector3 previousPosition = transform.position;
+            //m_characterController.enabled = false;
+            //transform.position = previousPosition;
+            //m_characterController.enabled = true;
+        //}
     }
 
 	void CaptureMouse() {

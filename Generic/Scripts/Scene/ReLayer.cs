@@ -6,9 +6,14 @@ public class ReLayer : MonoBehaviour {
     [Layer]
     public int m_layer;
 
+    [Layer]
+    public int m_ignoredLayer;
+
     void Start() {
         foreach (Transform t in GetComponentsInChildren<Transform>(true)) {
-            t.gameObject.layer = m_layer;
+            if (t.gameObject.layer != m_ignoredLayer) {
+                t.gameObject.layer = m_layer;
+            }
         }
 
         foreach (Light l in GetComponentsInChildren<Light>(true)) {
