@@ -7,7 +7,7 @@ public class InteractionNotifier : MonoBehaviour, IInteractive {
 
     public InteractionDelegate m_interactionDelegate;
 
-    void IInteractive.OnInteraction() {
+    void IInteractive.OnInteraction(GameObject interactingObject) {
         if (m_interactionDelegate != null) {
             m_interactionDelegate(gameObject);
         }

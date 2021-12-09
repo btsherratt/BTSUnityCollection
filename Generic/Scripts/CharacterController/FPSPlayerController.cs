@@ -41,12 +41,10 @@ public class FPSPlayerController : MonoBehaviour {
             ReleaseMouse();
         }
 
-        //m_headRotation.x = m_head.localRotation.x;
-        //m_headRotation.y = transform.localRotation.y;
-
+        Vector3 movementVector = Vector3.zero;
         if (m_captureMouse == false || m_mouseCaptured) {
             Vector2 currentMouseValues = MouseValues();
-            Vector2 delta = currentMouseValues - m_mousePreviousValues;
+            Vector2 delta = currentMouseValues;// - m_mousePreviousValues;
             //if (delta.magnitude > 0.1f) {
                 m_headRotation.y += delta.x * m_lookSensitivity * Time.deltaTime;
                 m_headRotation.x -= delta.y * m_lookSensitivity * Time.deltaTime;
@@ -63,14 +61,22 @@ public class FPSPlayerController : MonoBehaviour {
             direction += Input.GetKey(m_controlScheme.m_left) ? Vector3.left : Vector3.zero;
             direction += Input.GetKey(m_controlScheme.m_right) ? Vector3.right : Vector3.zero;
 
-            m_characterController.Move(correctedForwardQuaternion * direction.normalized * m_moveSpeed * Time.deltaTime);
+            movementVector = correctedForwardQuaternion * direction.normalized * m_moveSpeed;
         }
 
+
+        Vector3 gravityVector = Vector3.zero;
+        if (m_characterController.isGrounded == false) {
+            gravityVector = Physics.gravity;
+        }
+
+        m_characterController.Move((movementVector + gravityVector) * Time.deltaTime);
+
         //if (m_preventFalls && m_characterController.isGrounded == false) {
-            //Vector3 previousPosition = transform.position;
-            //m_characterController.enabled = false;
-            //transform.position = previousPosition;
-            //m_characterController.enabled = true;
+        //Vector3 previousPosition = transform.position;
+        //m_characterController.enabled = false;
+        //transform.position = previousPosition;
+        //m_characterController.enabled = true;
         //}
     }
 

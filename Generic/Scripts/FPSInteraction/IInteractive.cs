@@ -1,3 +1,5 @@
+using UnityEngine;
+
 public interface IInteractive {
-    void OnInteraction();
+    void OnInteraction(GameObject interactingObject);
 }

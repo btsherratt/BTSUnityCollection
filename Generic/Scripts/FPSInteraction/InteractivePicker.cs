@@ -39,7 +39,7 @@ public class InteractivePicker : MonoBehaviour {
 
         if (m_interactionAvailable && didTryInteract) {
             foreach (IInteractive interactiveObject in hit.collider.GetComponentsInParent<IInteractive>()) {
-                interactiveObject.OnInteraction();
+                interactiveObject.OnInteraction(gameObject);
             }
         }
     }

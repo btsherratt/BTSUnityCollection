@@ -10,7 +10,7 @@ Shader "Hidden/QADNERPortal" {
         Pass {
             //Cull Off
             ColorMask 0
-            ZWrite Off
+            //ZWrite Off
 
             Stencil {
                 Ref [_PortalID]
