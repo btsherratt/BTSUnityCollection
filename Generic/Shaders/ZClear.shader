@@ -1,5 +1,4 @@
-Shader "BTS/ZClear"
-{
+Shader "BTS/ZClear" {
     Properties {
     }
 

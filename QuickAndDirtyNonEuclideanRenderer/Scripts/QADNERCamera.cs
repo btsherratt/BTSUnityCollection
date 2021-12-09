@@ -28,10 +28,7 @@ public class QADNERCamera : MonoBehaviour {
     }
 
     private void OnDisable() {
-        foreach (RenderTexture rt in m_renderTextures) {
-            RenderTexture.ReleaseTemporary(rt);
-        }
-        m_renderTextures.Clear();
+        ReleaseRTs();
     }
 
     public void EnqueuePortal(QADNERPortal portal, Bounds bounds) {
@@ -41,12 +38,16 @@ public class QADNERCamera : MonoBehaviour {
         m_visiblePortals.Add(details);
     }
 
-    private void OnPostRender() {
+    void ReleaseRTs() {
         foreach (RenderTexture rt in m_renderTextures) {
             RenderTexture.ReleaseTemporary(rt);
         }
 
         m_renderTextures.Clear();
+    }
+
+    private void OnPostRender() {
+        ReleaseRTs();
 
         Camera mainCamera = GetComponent<Camera>();
         foreach (PortalDetails portalDetails in m_visiblePortals) {

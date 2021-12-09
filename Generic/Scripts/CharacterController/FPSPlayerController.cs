@@ -51,17 +51,9 @@ public class FPSPlayerController : MonoBehaviour {
             //}
         }
 
+        Quaternion correctedForwardQuaternion = Quaternion.Euler(0, m_head.eulerAngles.y, 0);
+
         Vector3 direction = Vector3.zero;
-
-        Vector3 forwardVector = m_head.forward;
-        forwardVector.y = 0.0f;
-
-        if (forwardVector.magnitude < float.Epsilon) {
-            forwardVector = Vector3.forward;
-        }
-
-        Quaternion correctedForwardQuaternion = Quaternion.LookRotation(forwardVector);
-
         direction += Input.GetKey(KeyCode.W) ? Vector3.forward : Vector3.zero;
         direction += Input.GetKey(KeyCode.S) ? Vector3.back : Vector3.zero;
         direction += Input.GetKey(KeyCode.A) ? Vector3.left : Vector3.zero;
