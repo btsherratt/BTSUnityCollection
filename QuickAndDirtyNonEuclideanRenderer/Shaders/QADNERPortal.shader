@@ -4,7 +4,11 @@ Shader "Hidden/QADNERPortal" {
     }
 
     SubShader {
-        Tags { "RenderType"="Opaque+100" }
+        Tags {
+            "Queue" = "Geometry+100"
+            "RenderType" = "Opaque"
+        }
+
         LOD 100
 
         Pass {

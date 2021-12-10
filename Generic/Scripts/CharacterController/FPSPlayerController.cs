@@ -78,6 +78,10 @@ public class FPSPlayerController : MonoBehaviour {
         //transform.position = previousPosition;
         //m_characterController.enabled = true;
         //}
+
+        if (Input.GetKeyDown(KeyCode.R)) {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+        }
     }
 
 	void CaptureMouse() {
