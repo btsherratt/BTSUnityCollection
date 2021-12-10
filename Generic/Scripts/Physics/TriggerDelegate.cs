@@ -9,7 +9,7 @@ public class TriggerDelegate : MonoBehaviour {
     public TriggerExitDelegate m_triggerExitDelegate;
     public TriggerStayDelegate m_triggerStayDelegate;
 
-    Collider m_collider;
+    public Collider m_collider { get; private set; }
 
     void Start() {
         m_collider = GetComponent<Collider>();
