@@ -38,15 +38,8 @@ public class QADNERPortal : MonoBehaviour {
             Vector3 positionDelta = transform.position - Camera.current.transform.position;
             float forwardDot = Vector3.Dot(positionDelta, transform.forward);
 
-            if (forwardDot > 0.0f) {
-                //Debug.Log("Door will render: " + this);
+            if (positionDelta.magnitude <= 1.0f || forwardDot > 0.0f) {
                 QADNERCamera.Instance.EnqueuePortal(this, m_meshRenderer.bounds);
-
-                //Bounds bounds = m_meshRenderer.bounds;
-                //Vector3 tl = Camera.current.worldToCameraMatrix * bounds.min;
-                //Vector3 br = Camera.current.worldToCameraMatrix * bounds.max;
-                //bounds = Camera.current.worldToCameraMatrix * bounds;
-                //Debug.Log($"{tl} .... {br}");
             }
         }
     }

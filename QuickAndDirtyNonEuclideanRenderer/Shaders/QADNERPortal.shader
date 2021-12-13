@@ -12,7 +12,7 @@ Shader "Hidden/QADNERPortal" {
         LOD 100
 
         Pass {
-            //Cull Off
+            //Cull Front
             ColorMask 0
             //ZWrite Off
 

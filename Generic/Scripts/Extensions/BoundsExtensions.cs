@@ -18,11 +18,16 @@ public static class BoundsExtensions {
         yield return bounds.center + extentsX + extentsY + extentsZ;
     }
 
-    public static Rect ToViewportRect(this Bounds bounds, Camera camera) {
+    public static Rect ToViewportRect(this Bounds bounds, Camera camera, out float nearZ) {
         Vector2 min = Vector2.one;
         Vector2 max = Vector2.zero;
 
+        nearZ = camera.farClipPlane;
+
         foreach (Vector3 point in bounds.Corners()) {
+            Vector3 localPoint = camera.transform.InverseTransformPoint(point);
+            nearZ = Mathf.Min(nearZ, localPoint.z);
+
             Vector2 transformedPoint = camera.WorldToViewportPoint(point);
             min = Vector2.Min(min, transformedPoint);
             max = Vector2.Max(max, transformedPoint);

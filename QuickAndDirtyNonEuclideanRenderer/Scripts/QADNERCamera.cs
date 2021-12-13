@@ -88,8 +88,11 @@ public class QADNERCamera : MonoBehaviour {
                 m_redrawCamera.nearClipPlane = Vector3.Distance(m_redrawCamera.transform.position, portalDetails.bounds.ClosestPoint(m_redrawCamera.transform.position));
             }*/
 
-            //m_redrawCamera.rect = portalDetails.bounds.ToViewportRect(mainCamera);
-            SetScissorRect(m_redrawCamera, portalDetails.bounds.ToViewportRect(mainCamera));
+            float nearZ;
+            Rect drawRect = portalDetails.bounds.ToViewportRect(mainCamera, out nearZ);
+            //SetScissorRect(m_redrawCamera, drawRect);
+            m_redrawCamera.nearClipPlane = Mathf.Max(nearZ, 0.01f);
+
             m_redrawCamera.targetTexture = tex;
             m_redrawCamera.cullingMask = (1 << portal.m_linkedPortal.gameObject.layer);
             m_redrawCamera.Render();
@@ -102,15 +105,18 @@ public class QADNERCamera : MonoBehaviour {
             m_mergeMaterial.SetInt("_PortalID", portal.m_portalID);
             m_mergeMaterial.SetPass(0);
 
+            // FIXME: won't work properly if we're really close unless we do this
+            drawRect = new Rect(0, 0, 1, 1);
+
             GL.Begin(GL.QUADS);
-            GL.TexCoord2(0, 0);
-            GL.Vertex3(0, 0, 0);
-            GL.TexCoord2(1, 0);
-            GL.Vertex3(1, 0, 0);
-            GL.TexCoord2(1, 1);
-            GL.Vertex3(1, 1, 0);
-            GL.TexCoord2(0, 1);
-            GL.Vertex3(0, 1, 0);
+            GL.TexCoord2(drawRect.min.x, drawRect.min.y);
+            GL.Vertex3(drawRect.min.x, drawRect.min.y, 0);
+            GL.TexCoord2(drawRect.max.x, drawRect.min.y);
+            GL.Vertex3(drawRect.max.x, drawRect.min.y, 0);
+            GL.TexCoord2(drawRect.max.x, drawRect.max.y);
+            GL.Vertex3(drawRect.max.x, drawRect.max.y, 0);
+            GL.TexCoord2(drawRect.min.x, drawRect.max.y);
+            GL.Vertex3(drawRect.min.x, drawRect.max.y, 0);
             GL.End();
 
             GL.PopMatrix();
