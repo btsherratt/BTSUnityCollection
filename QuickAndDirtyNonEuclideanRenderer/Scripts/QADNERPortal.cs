@@ -35,14 +35,19 @@ public class QADNERPortal : MonoBehaviour {
         m_meshRenderer.enabled = (m_linkedPortal != null);
 
         if (Camera.current.gameObject == QADNERCamera.Instance.gameObject && m_linkedPortal != null) {
-            //Debug.Log("Door will render: " + this);
-            QADNERCamera.Instance.EnqueuePortal(this, m_meshRenderer.bounds);
+            Vector3 positionDelta = transform.position - Camera.current.transform.position;
+            float forwardDot = Vector3.Dot(positionDelta, transform.forward);
 
-            //Bounds bounds = m_meshRenderer.bounds;
-            //Vector3 tl = Camera.current.worldToCameraMatrix * bounds.min;
-            //Vector3 br = Camera.current.worldToCameraMatrix * bounds.max;
-            //bounds = Camera.current.worldToCameraMatrix * bounds;
-            //Debug.Log($"{tl} .... {br}");
+            if (forwardDot > 0.0f) {
+                //Debug.Log("Door will render: " + this);
+                QADNERCamera.Instance.EnqueuePortal(this, m_meshRenderer.bounds);
+
+                //Bounds bounds = m_meshRenderer.bounds;
+                //Vector3 tl = Camera.current.worldToCameraMatrix * bounds.min;
+                //Vector3 br = Camera.current.worldToCameraMatrix * bounds.max;
+                //bounds = Camera.current.worldToCameraMatrix * bounds;
+                //Debug.Log($"{tl} .... {br}");
+            }
         }
     }
 

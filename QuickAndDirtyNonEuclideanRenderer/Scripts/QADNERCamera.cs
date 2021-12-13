@@ -50,11 +50,12 @@ public class QADNERCamera : MonoBehaviour {
         ReleaseRTs();
 
         Camera mainCamera = GetComponent<Camera>();
+
+        RenderTexture tex = RenderTexture.GetTemporary(Screen.width, Screen.height, 24);
+        m_renderTextures.Add(tex);
+
         foreach (PortalDetails portalDetails in m_visiblePortals) {
             QADNERPortal portal = portalDetails.portal;
-
-            RenderTexture tex = RenderTexture.GetTemporary(Screen.width, Screen.height, 24);
-            m_renderTextures.Add(tex);
 
             portal.PortalRenderStart(this);
             m_redrawCamera.CopyFrom(mainCamera);
@@ -87,6 +88,8 @@ public class QADNERCamera : MonoBehaviour {
                 m_redrawCamera.nearClipPlane = Vector3.Distance(m_redrawCamera.transform.position, portalDetails.bounds.ClosestPoint(m_redrawCamera.transform.position));
             }*/
 
+            //m_redrawCamera.rect = portalDetails.bounds.ToViewportRect(mainCamera);
+            SetScissorRect(m_redrawCamera, portalDetails.bounds.ToViewportRect(mainCamera));
             m_redrawCamera.targetTexture = tex;
             m_redrawCamera.cullingMask = (1 << portal.m_linkedPortal.gameObject.layer);
             m_redrawCamera.Render();
@@ -118,8 +121,51 @@ public class QADNERCamera : MonoBehaviour {
         }
 
         m_visiblePortals.Clear();
-
     }
+
+
+    // From https://forum.unity.com/threads/scissor-rectangle.37612/
+    public static void SetScissorRect(Camera cam, Rect r) {
+        if (r.x < 0) {
+            r.width += r.x;
+            r.x = 0;
+        }
+
+        if (r.y < 0) {
+            r.height += r.y;
+            r.y = 0;
+        }
+
+        r.width = Mathf.Min(1 - r.x, r.width);
+        r.height = Mathf.Min(1 - r.y, r.height);
+        //		print( r );
+
+        cam.rect = new Rect(0, 0, 1, 1);
+        cam.ResetProjectionMatrix();
+        Matrix4x4 m = cam.projectionMatrix;
+        //		print( cam.projectionMatrix );
+        //		print( Mathf.Rad2Deg * Mathf.Atan( 1 / cam.projectionMatrix[ 0 ] ) * 2 );
+        cam.rect = r;
+        //		cam.projectionMatrix = m;
+        //		print( cam.projectionMatrix );		
+        //		print( Mathf.Rad2Deg * Mathf.Atan( 1 / cam.projectionMatrix[ 0 ] ) * 2 );
+        //		print( cam.fieldOfView );
+        //		print( Mathf.Tan( cam.projectionMatrix[ 1, 1 ] ) * 2 );
+        //		cam.pixelRect = new Rect( 0, 0, Screen.width / 2, Screen.height );
+        Matrix4x4 m1 = Matrix4x4.TRS(new Vector3(r.x, r.y, 0), Quaternion.identity, new Vector3(r.width, r.height, 1));
+        //		Matrix4x4 m1 = Matrix4x4.TRS( Vector3.zero, Quaternion.identity, new Vector3( r.width, r.height, 1 ) );
+        //		Matrix4x4 m2 = m1.inverse;
+        //		print( m2 );
+        Matrix4x4 m2 = Matrix4x4.TRS(new Vector3((1 / r.width - 1), (1 / r.height - 1), 0), Quaternion.identity, new Vector3(1 / r.width, 1 / r.height, 1));
+        Matrix4x4 m3 = Matrix4x4.TRS(new Vector3(-r.x * 2 / r.width, -r.y * 2 / r.height, 0), Quaternion.identity, Vector3.one);
+        //		m2[ 0, 3 ] = r.x;
+        //		m2[ 1, 3 ] = r.y;
+        //		print( m3 );
+        //		print( cam.projectionMatrix );
+        cam.projectionMatrix = m3 * m2 * m;
+        //		print( cam.projectionMatrix );		
+    }
+
 
     //private void OnPostRender(RenderTexture source, RenderTexture destination) {
     //  RenderTexture tmpTexture2 = RenderTexture.GetTemporary(source.width, source.height, 24, source.format);
