@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public abstract class VectorLineDrawable : MonoBehaviour {
+    public const int INVALID_ID = 0;
+
     const int MAX_INSTANCES = 1024;
     static VectorLineDrawable[] ms_instances;
     static int ms_currentInstanceCount;
@@ -54,4 +56,8 @@ public abstract class VectorLineDrawable : MonoBehaviour {
     public abstract int VertexCount { get; }
 
     public abstract IEnumerable<VectorLineVertex> GetVertices();
+
+    private void OnEnable() {
+        // We just want the enable box to show up... Thanks... :)
+    }
 }
