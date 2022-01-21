@@ -33,7 +33,7 @@ public class VectorLinePipeline : RenderPipeline {
     public VectorLinePipeline(VectorLinePipelineAsset asset) {
         m_asset = asset;
 
-        m_renderMaterial = new Material(Shader.Find("Hidden/BTS/VectorLine/Basic"));
+        m_renderMaterial = new Material(asset.m_basicShader);
         m_cachedShapeData = new Dictionary<int, CachedData>();
     }
 
