@@ -81,6 +81,12 @@ public class VectorLinePipeline : RenderPipeline {
         m_cachedShapeData = new Dictionary<int, CachedData>();
     }
 
+    ~VectorLinePipeline() {
+        foreach (CachedData data in m_cachedShapeData.Values) {
+            data.m_vertexBuffer.Release();
+        }
+    }
+
     protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
         // Rebuild data here probably...
 
@@ -92,7 +98,7 @@ public class VectorLinePipeline : RenderPipeline {
             CommandBuffer cameraCommandBuffer = new CommandBuffer();
             cameraCommandBuffer.ClearRenderTarget(camera.clearFlags == CameraClearFlags.SolidColor, true, camera.backgroundColor);
 
-            foreach (VectorLineDrawable drawable in GameObject.FindObjectsOfType<VectorLineDrawable>()) {
+            foreach (VectorLineDrawable drawable in VectorLineDrawable.All(true)) {
                 int drawableID = drawable.DrawableID;
 
                 CachedData cachedData;
