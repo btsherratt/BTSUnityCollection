@@ -3,6 +3,11 @@ using UnityEditor;
 
 [CustomPropertyDrawer(typeof(DirtyField<>), true)]
 public class DirtyFieldPropertyDrawer : PropertyDrawer {
+    public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
+        SerializedProperty valueProperty = property.FindPropertyRelative("m_value");
+        return EditorGUI.GetPropertyHeight(valueProperty, label);
+    }
+
     public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
         SerializedProperty valueProperty = property.FindPropertyRelative("m_value");
 
