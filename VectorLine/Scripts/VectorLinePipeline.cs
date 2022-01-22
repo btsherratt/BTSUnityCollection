@@ -4,6 +4,10 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 public class VectorLinePipeline : RenderPipeline {
+    const int MAX_DRAWABLE_VERTEX_COUNT = 1024;
+
+    static Vertex[] ms_vertices;
+
     struct Vertex {
         public Vector3 position;
         public Vector4 color;
@@ -31,9 +35,12 @@ public class VectorLinePipeline : RenderPipeline {
     Dictionary<int, CachedData> m_cachedShapeData;
 
     public VectorLinePipeline(VectorLinePipelineAsset asset) {
-        m_asset = asset;
+        if (ms_vertices == null) {
+            ms_vertices = new Vertex[MAX_DRAWABLE_VERTEX_COUNT];
+        }
 
-        m_renderMaterial = new Material(asset.m_basicShader);
+        m_asset = asset;
+        LoadMaterials();
         m_cachedShapeData = new Dictionary<int, CachedData>();
     }
 
@@ -45,7 +52,18 @@ public class VectorLinePipeline : RenderPipeline {
         base.Dispose(disposing);
     }
 
+    void LoadMaterials() {
+        m_renderMaterial = new Material(m_asset.m_basicShader);
+    }
+
     protected override void Render(ScriptableRenderContext context, Camera[] cameras) {
+#if UNITY_EDITOR
+        // Safety for a weird editor bug that happens when player is built...
+        if (m_renderMaterial == null) {
+            LoadMaterials();
+        }
+#endif
+
         // Rebuild data here probably...
 
         foreach (Camera camera in cameras) {
@@ -61,38 +79,41 @@ public class VectorLinePipeline : RenderPipeline {
                     CachedData cachedData;
                     bool dataAvailable = m_cachedShapeData.TryGetValue(drawableID, out cachedData);
 
-                    if (drawable.IsDirty) {
-                        if (dataAvailable) {
-                            cachedData.m_vertexBuffer.Release();
-                        }
-                        dataAvailable = false;
-                    }
-
-                    if (dataAvailable == false) {
+                    if (dataAvailable == false || drawable.IsDirty) {
                         int vertexCount = drawable.VertexCount;
 
                         if (vertexCount > 0) {
-                            cachedData = new CachedData();
+                            if (dataAvailable == false) {
+                                cachedData = new CachedData();
+                                cachedData.m_materialProperties = new MaterialPropertyBlock();
+                            }
 
-                            Vertex[] vertices = new Vertex[drawable.VertexCount];
                             int idx = 0;
                             foreach (VectorLineVertex vertex in drawable.GetVertices()) {
-                                if (idx >= vertices.Length) {
+                                if (idx >= ms_vertices.Length) {
+                                    Debug.LogError($"Drawable gave too many vertices!", drawable);
                                     break;
                                 }
 
-                                vertices[idx] = new Vertex(vertex);
+                                ms_vertices[idx] = new Vertex(vertex);
                                 idx += 1;
                             }
 
-                            cachedData.m_vertexBuffer = new ComputeBuffer(vertices.Length, Marshal.SizeOf(typeof(Vertex)), ComputeBufferType.Default); //new GraphicsBuffer(GraphicsBuffer.Target.Vertex, vertices.Length, Marshal.SizeOf(typeof(Vertex)));
-                            cachedData.m_vertexBuffer.SetData(vertices);
+                            Debug.Assert(idx == vertexCount, $"Drawable '{drawable}' returned incorrect number of vertices, expected {vertexCount}, got {idx}!", drawable);
 
-                            cachedData.m_materialProperties = new MaterialPropertyBlock();
-                            cachedData.m_materialProperties.SetBuffer("vertices", cachedData.m_vertexBuffer);
+                            if (cachedData.m_vertexBuffer == null || cachedData.m_vertexBuffer.count != vertexCount) {
+                                cachedData.m_vertexBuffer?.Release();
+                                cachedData.m_vertexBuffer = new ComputeBuffer(vertexCount, Marshal.SizeOf(typeof(Vertex)), ComputeBufferType.Default); //new GraphicsBuffer(GraphicsBuffer.Target.Vertex, vertices.Length, Marshal.SizeOf(typeof(Vertex)));
+                                cachedData.m_materialProperties.SetBuffer("vertices", cachedData.m_vertexBuffer);
+                            }
+
+                            cachedData.m_vertexBuffer.SetData(ms_vertices, 0, 0, vertexCount);
 
                             m_cachedShapeData[drawableID] = cachedData;
                             dataAvailable = true;
+                        } else {
+                            // FIXME, better way to mark this?
+                            dataAvailable = false;
                         }
                     }
 
@@ -105,11 +126,13 @@ public class VectorLinePipeline : RenderPipeline {
             context.ExecuteCommandBuffer(cameraCommandBuffer);
             cameraCommandBuffer.Release();
 
+#if UNITY_EDITOR
             if (camera.cameraType == CameraType.SceneView) {
                 ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
                 context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
                 context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
             }
+#endif
 
             context.Submit();
         }

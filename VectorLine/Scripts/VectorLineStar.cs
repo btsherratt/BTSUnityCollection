@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class VectorLineStar : VectorLineDrawable {
-    public override bool IsDirty => m_points.Dirty || m_innerRadius.Dirty || m_outerRadius.Dirty || m_innerRelativeOffset.Dirty || m_innerColor.Dirty || m_outerColor.Dirty || m_starburst.Dirty;
+    public override bool IsDirty => m_points.Dirty || m_innerRadius.Dirty || m_outerRadius.Dirty || m_angleOffset.Dirty || m_innerRelativeOffset.Dirty || m_innerColor.Dirty || m_outerColor.Dirty || m_starburst.Dirty;
 
     public DirtyField<int> m_points = 5;
 
     public DirtyField<float> m_innerRadius = 0.3f;
     public DirtyField<float> m_outerRadius = 1.0f;
 
+    public DirtyField<float> m_angleOffset = 0.0f;
     public DirtyField<float> m_innerRelativeOffset = 0.5f;
 
     public DirtyField<Color> m_innerColor = Color.white;
@@ -34,9 +35,9 @@ public class VectorLineStar : VectorLineDrawable {
             Vector3 innerOffset = Vector3.up * m_innerRadius;
             Vector3 outerOffset = Vector3.up * m_outerRadius;
 
-            Quaternion rotationA = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(MathFFS.InverseLerpUnclamped(0, m_points, i), 1.0f)));
-            Quaternion rotationB = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(Mathf.Lerp(MathFFS.InverseLerpUnclamped(0, m_points, i), MathFFS.InverseLerpUnclamped(0, m_points, i + 1), m_innerRelativeOffset), 1.0f)));
-            Quaternion rotationC = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(MathFFS.InverseLerpUnclamped(0, m_points, i + 1), 1.0f)));
+            Quaternion rotationA = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(MathFFS.InverseLerpUnclamped(0, m_points, i), 1.0f)) + m_angleOffset);
+            Quaternion rotationB = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(Mathf.Lerp(MathFFS.InverseLerpUnclamped(0, m_points, i), MathFFS.InverseLerpUnclamped(0, m_points, i + 1), m_innerRelativeOffset), 1.0f)) + m_angleOffset);
+            Quaternion rotationC = Quaternion.Euler(0, 0, Mathf.Lerp(0.0f, 360.0f, Mathf.Repeat(MathFFS.InverseLerpUnclamped(0, m_points, i + 1), 1.0f)) + m_angleOffset);
 
             Vector3 previousOuterPosition = rotationA * outerOffset;
             Vector3 innerPosition = rotationB * innerOffset;

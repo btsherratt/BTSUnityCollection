@@ -18,7 +18,7 @@ public class TrackedMonoBehaviour<T> : MonoBehaviour where T : TrackedMonoBehavi
         ++ms_currentInstanceCount;
     }
 
-    static public IEnumerable<T> All(bool filterActive) {
+    static public IEnumerable<T> All(bool filterActive = false) {
         if (ms_instances != null) {
             for (int i = 0; i < ms_currentInstanceCount; ++i) {
                 T instance = ms_instances[i];

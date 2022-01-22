@@ -1,13 +1,15 @@
 using UnityEngine;
 
 public class QuickCollisionWorld {
-    public static int QueryCollisions(ref QuickCollisionPair[] collisionPairsOut, QuickCollider collider, int collisionMask = 0xFF) {
+    public static int QueryCollisions(QuickCollisionPair[] collisionPairsOut, QuickCollider collider, int collisionMask = 0xFF) {
         int collisionCount = 0;
 
         foreach (QuickCollider testCollider in QuickCollider.All(true)) {
             if (testCollider != collider && (testCollider.m_collisionMask & collisionMask) > 0) {
                 if (TestCircleCircle((QuickCircleCollider)collider, (QuickCircleCollider)testCollider)) {
-                    collisionPairsOut[collisionCount] = new QuickCollisionPair(collider, testCollider);
+                    if (collisionPairsOut != null) {
+                        collisionPairsOut[collisionCount] = new QuickCollisionPair(collider, testCollider);
+                    }
                     ++collisionCount;
                 }
             }

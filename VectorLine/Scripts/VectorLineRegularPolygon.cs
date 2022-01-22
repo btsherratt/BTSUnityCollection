@@ -11,7 +11,7 @@ public class VectorLineRegularPolygon : VectorLineDrawable {
 
     public DirtyField<Color> m_color = Color.white;
 
-    public override int VertexCount => (m_corners + 1) * 2;
+    public override int VertexCount => m_corners * 2;
 
     public override IEnumerable<VectorLineVertex> GetVertices() {
         m_corners.MarkClean();

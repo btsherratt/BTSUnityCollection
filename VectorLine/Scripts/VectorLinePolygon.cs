@@ -21,17 +21,19 @@ public class VectorLinePolygon : VectorLineDrawable {
         for (int i = 1; i < m_polygonAsset.m_vertices.Length; ++i) {
             VectorLineVertex vertex = m_polygonAsset.m_vertices[i];
 
+            yield return previousVertex;
+
             if (m_polygonAsset.m_lineLoop) {
-                yield return previousVertex;
+                yield return vertex;
             }
-            yield return vertex;
 
             previousVertex = vertex;
         }
+        
+        yield return previousVertex;
 
         if (m_polygonAsset.m_lineLoop) {
-            yield return previousVertex;
+            yield return initialVertex;
         }
-        yield return initialVertex;
     }
 }

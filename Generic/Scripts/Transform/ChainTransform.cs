@@ -13,34 +13,44 @@ public class ChainTransform : MonoBehaviour {
     ChainTransform m_nextChainedTransform;
 
     private void OnEnable() {
-        if (m_chainedTransform != null) {
-            m_chainedTransform.m_nextChainedTransform = this;
-        }
+        ForceUpdateChain();
     }
 
     void LateUpdate() {
         if (m_chainedTransform == null) {
-            ChainTransform parentChainTransform = this;
-            ChainTransform currentChainTransform = m_nextChainedTransform;
-            while (currentChainTransform != null) {
-                Vector3 targetPosition = parentChainTransform.transform.TransformPoint(parentChainTransform.m_attachPoint);
-                Vector3 currentPosition = currentChainTransform.transform.TransformPoint(currentChainTransform.m_chainPoint);
-                Vector3 currentAnglePosition = currentChainTransform.transform.TransformPoint(currentChainTransform.m_attachPoint);
+            ForceUpdateChain();
+        }
+    }
 
-                Vector3 targetPositionDelta = targetPosition - currentPosition;
-                Vector3 targetAngleDelta = targetPosition - currentAnglePosition;
-                if (targetPositionDelta.sqrMagnitude > 0) {
-                    targetAngleDelta.Normalize();
-                    Quaternion targetRotation = Quaternion.Euler(0, 0, Mathf.Atan2(targetAngleDelta.y, targetAngleDelta.x) * Mathf.Rad2Deg - 90.0f);
+    public void ForceUpdateChain() {
+        ChainTransform currentChainTransform = this;
 
-                    currentChainTransform.transform.rotation = targetRotation;
+        while (currentChainTransform.m_chainedTransform != null) {
+            currentChainTransform.m_chainedTransform.m_nextChainedTransform = currentChainTransform;
+            currentChainTransform = currentChainTransform.m_chainedTransform;
+        }
 
-                    currentChainTransform.transform.position = targetPosition - currentChainTransform.transform.TransformVector(currentChainTransform.m_chainPoint);
-                }
+        ChainTransform parentChainTransform = currentChainTransform;
+        currentChainTransform = currentChainTransform.m_nextChainedTransform;
 
-                parentChainTransform = currentChainTransform;
-                currentChainTransform = currentChainTransform.m_nextChainedTransform;
+        while (currentChainTransform != null) {
+            Vector3 targetPosition = parentChainTransform.transform.TransformPoint(parentChainTransform.m_attachPoint);
+            Vector3 currentPosition = currentChainTransform.transform.TransformPoint(currentChainTransform.m_chainPoint);
+            Vector3 currentAnglePosition = currentChainTransform.transform.TransformPoint(currentChainTransform.m_attachPoint);
+
+            Vector3 targetPositionDelta = targetPosition - currentPosition;
+            Vector3 targetAngleDelta = targetPosition - currentAnglePosition;
+            if (targetPositionDelta.sqrMagnitude > 0) {
+                targetAngleDelta.Normalize();
+                Quaternion targetRotation = Quaternion.Euler(0, 0, Mathf.Atan2(targetAngleDelta.y, targetAngleDelta.x) * Mathf.Rad2Deg - 90.0f);
+
+                currentChainTransform.transform.rotation = targetRotation;
+
+                currentChainTransform.transform.position = targetPosition - currentChainTransform.transform.TransformVector(currentChainTransform.m_chainPoint);
             }
+
+            parentChainTransform = currentChainTransform;
+            currentChainTransform = currentChainTransform.m_nextChainedTransform;
         }
     }
 
