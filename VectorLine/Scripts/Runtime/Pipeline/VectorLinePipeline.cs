@@ -6,6 +6,7 @@ using UnityEngine.Rendering;
 public class VectorLinePipeline : RenderPipeline {
     const int MAX_DRAWABLE_COUNT = 1024;
     const int MAX_DRAWABLE_VERTEX_COUNT = 1024;
+    const int MAX_CAMERA_BUFFERS = 3;
 
     static VectorLineDrawable[] ms_drawableArray = new VectorLineDrawable[MAX_DRAWABLE_COUNT];
     static VertexArray ms_vertexArray;
@@ -54,7 +55,9 @@ public class VectorLinePipeline : RenderPipeline {
     Material m_renderMaterial;
 
     Dictionary<int, CachedData> m_cachedShapeData;
-    CommandBuffer m_cameraCommandBuffer;
+
+    CommandBuffer[] m_cameraCommandBuffers = new CommandBuffer[MAX_CAMERA_BUFFERS];
+    int m_currentCameraCommandBuffer;
 
     public VectorLinePipeline(VectorLinePipelineAsset asset) {
         if (ms_vertexArray == null) {
@@ -65,7 +68,10 @@ public class VectorLinePipeline : RenderPipeline {
         LoadMaterials();
         m_cachedShapeData = new Dictionary<int, CachedData>();
 
-        m_cameraCommandBuffer = new CommandBuffer();
+        for (int i = 0; i < m_cameraCommandBuffers.Length; ++i) {
+            m_cameraCommandBuffers[i] = new CommandBuffer();
+        }
+        m_currentCameraCommandBuffer = 0;
     }
 
     protected override void Dispose(bool disposing) {
@@ -73,7 +79,9 @@ public class VectorLinePipeline : RenderPipeline {
             data.m_vertexBuffer.Release();
         }
 
-        m_cameraCommandBuffer.Release();
+        for (int i = 0; i < m_cameraCommandBuffers.Length; ++i) {
+            m_cameraCommandBuffers[i].Release();
+        }
 
         base.Dispose(disposing);
     }
@@ -99,8 +107,11 @@ public class VectorLinePipeline : RenderPipeline {
 
             context.SetupCameraProperties(camera);
 
-            m_cameraCommandBuffer.Clear();
-            m_cameraCommandBuffer.ClearRenderTarget(camera.clearFlags == CameraClearFlags.SolidColor, true, camera.backgroundColor);
+            CommandBuffer cameraCommandBuffer = m_cameraCommandBuffers[m_currentCameraCommandBuffer];
+            m_currentCameraCommandBuffer = (m_currentCameraCommandBuffer + 1) % m_cameraCommandBuffers.Length;
+
+            cameraCommandBuffer.Clear();
+            cameraCommandBuffer.ClearRenderTarget(camera.clearFlags == CameraClearFlags.SolidColor, true, camera.backgroundColor);
 
             for (int drawableIdx = 0; drawableIdx < drawableCount; ++drawableIdx) {
                 VectorLineDrawable drawable = ms_drawableArray[drawableIdx];
@@ -140,12 +151,12 @@ public class VectorLinePipeline : RenderPipeline {
                     }
 
                     if (dataAvailable) {
-                        m_cameraCommandBuffer.DrawProcedural(drawable.transform.localToWorldMatrix, m_renderMaterial, 0, MeshTopology.Lines, cachedData.m_vertexBuffer.count, 1, cachedData.m_materialProperties);
+                        cameraCommandBuffer.DrawProcedural(drawable.transform.localToWorldMatrix, m_renderMaterial, 0, MeshTopology.Lines, cachedData.m_vertexBuffer.count, 1, cachedData.m_materialProperties);
                     }
                 }
             }
 
-            context.ExecuteCommandBuffer(m_cameraCommandBuffer);
+            context.ExecuteCommandBuffer(cameraCommandBuffer);
 
 #if UNITY_EDITOR
             if (camera.cameraType == CameraType.SceneView) {
