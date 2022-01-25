@@ -14,12 +14,15 @@ public class DirtyFieldPropertyDrawer : PropertyDrawer {
         EditorGUI.BeginChangeCheck();
 
         //cur.serializedObject.Update();
-        EditorGUI.PropertyField(position, valueProperty, label);
+        EditorGUI.PropertyField(position, valueProperty, label, true);
         //cur.serializedObject.ApplyModifiedProperties();
         
-        if (EditorGUI.EndChangeCheck() && property.serializedObject.hasModifiedProperties) {
+        if ((EditorGUI.EndChangeCheck() && property.serializedObject.hasModifiedProperties)) {
             IDirtyFieldPropertyDrawerExtensions dirtyField = fieldInfo.GetValue(property.serializedObject.targetObject) as IDirtyFieldPropertyDrawerExtensions;
             fieldInfo.SetValue(property.serializedObject.targetObject, dirtyField.EditedField());
+
+            //Undo.RecordObject(property.serializedObject.targetObject, $"Modified property {property.name}");
+            //property.serializedObject.ApplyModifiedProperties();
         }
     }
 }

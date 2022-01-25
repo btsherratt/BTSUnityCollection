@@ -18,30 +18,53 @@ public class TrackedMonoBehaviour<T> : MonoBehaviour where T : TrackedMonoBehavi
         ++ms_currentInstanceCount;
     }
 
-    static public IEnumerable<T> All(bool filterActive = false) {
+    static T GetInstance(int idx) {
+        T instance = ms_instances[idx];
+
+        while (instance == null) {
+            --ms_currentInstanceCount;
+
+            instance = ms_instances[ms_currentInstanceCount];
+            ms_instances[idx] = instance;
+            ms_instances[ms_currentInstanceCount] = null;
+
+            if (idx >= ms_currentInstanceCount) {
+                break;
+            }
+        }
+
+        if (idx >= ms_currentInstanceCount) {
+            instance = null;
+        }
+
+        return instance;
+    }
+
+    public static IEnumerable<T> All(bool filterActive = false) {
         if (ms_instances != null) {
             for (int i = 0; i < ms_currentInstanceCount; ++i) {
-                T instance = ms_instances[i];
-
-                while (instance == null) {
-                    --ms_currentInstanceCount;
-
-                    instance = ms_instances[ms_currentInstanceCount];
-                    ms_instances[i] = instance;
-                    ms_instances[ms_currentInstanceCount] = null;
-
-                    if (i >= ms_currentInstanceCount) {
-                        break;
-                    }
-                }
-
-                if (i < ms_currentInstanceCount) {
-                    if (filterActive == false || instance.isActiveAndEnabled) {
-                        yield return instance;
-                    }
+                T instance = GetInstance(i);
+                if (instance != null && (filterActive == false || instance.isActiveAndEnabled)) {
+                    yield return instance;
                 }
             }
         }
+    }
+
+    public static int Populate(T[] outArray, bool filterActive = false) {
+        int populatedCount = 0;
+
+        if (ms_instances != null) {
+            for (int i = 0; i < ms_currentInstanceCount; ++i) {
+                T instance = GetInstance(i);
+                if (instance != null && (filterActive == false || instance.isActiveAndEnabled)) {
+                    outArray[populatedCount] = instance;
+                    populatedCount += 1;
+                }
+            }
+        }
+
+        return populatedCount;
     }
 
     public TrackedMonoBehaviour() {

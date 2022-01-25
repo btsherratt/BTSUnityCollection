@@ -4,9 +4,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 public class VectorLinePipeline : RenderPipeline {
+    const int MAX_DRAWABLE_COUNT = 1024;
     const int MAX_DRAWABLE_VERTEX_COUNT = 1024;
 
-    static Vertex[] ms_vertices;
+    static VectorLineDrawable[] ms_drawableArray = new VectorLineDrawable[MAX_DRAWABLE_COUNT];
+    static VertexArray ms_vertexArray;
 
     struct Vertex {
         public Vector3 position;
@@ -15,6 +17,25 @@ public class VectorLinePipeline : RenderPipeline {
         public Vertex(VectorLineVertex vlvtx) {
             position = vlvtx.position;
             color = vlvtx.color;
+        }
+    }
+
+    class VertexArray : IVectorLineVertexArray {
+        public Vertex[] vertices { get; private set; }
+        public int currentVertex { get; private set; }
+
+        public VertexArray(int vertexCount) {
+            vertices = new Vertex[vertexCount];
+            currentVertex = 0;
+        }
+
+        public void Reset() {
+            currentVertex = 0;
+        }
+
+        void IVectorLineVertexArray.AddVertex(VectorLineVertex vertex) {
+            vertices[currentVertex] = new Vertex(vertex);
+            currentVertex += 1;
         }
     }
 
@@ -33,21 +54,26 @@ public class VectorLinePipeline : RenderPipeline {
     Material m_renderMaterial;
 
     Dictionary<int, CachedData> m_cachedShapeData;
+    CommandBuffer m_cameraCommandBuffer;
 
     public VectorLinePipeline(VectorLinePipelineAsset asset) {
-        if (ms_vertices == null) {
-            ms_vertices = new Vertex[MAX_DRAWABLE_VERTEX_COUNT];
+        if (ms_vertexArray == null) {
+            ms_vertexArray = new VertexArray(MAX_DRAWABLE_VERTEX_COUNT);
         }
 
         m_asset = asset;
         LoadMaterials();
         m_cachedShapeData = new Dictionary<int, CachedData>();
+
+        m_cameraCommandBuffer = new CommandBuffer();
     }
 
     protected override void Dispose(bool disposing) {
         foreach (CachedData data in m_cachedShapeData.Values) {
             data.m_vertexBuffer.Release();
         }
+
+        m_cameraCommandBuffer.Release();
 
         base.Dispose(disposing);
     }
@@ -66,13 +92,18 @@ public class VectorLinePipeline : RenderPipeline {
 
         // Rebuild data here probably...
 
-        foreach (Camera camera in cameras) {
+        int drawableCount = VectorLineDrawable.Populate(ms_drawableArray, true);
+
+        for (int cameraIdx = 0; cameraIdx < cameras.Length; ++cameraIdx) {
+            Camera camera = cameras[cameraIdx];
+
             context.SetupCameraProperties(camera);
 
-            CommandBuffer cameraCommandBuffer = new CommandBuffer();
-            cameraCommandBuffer.ClearRenderTarget(camera.clearFlags == CameraClearFlags.SolidColor, true, camera.backgroundColor);
+            m_cameraCommandBuffer.Clear();
+            m_cameraCommandBuffer.ClearRenderTarget(camera.clearFlags == CameraClearFlags.SolidColor, true, camera.backgroundColor);
 
-            foreach (VectorLineDrawable drawable in VectorLineDrawable.All(true)) {
+            for (int drawableIdx = 0; drawableIdx < drawableCount; ++drawableIdx) {
+                VectorLineDrawable drawable = ms_drawableArray[drawableIdx];
                 int drawableID = drawable.DrawableID;
 
                 if (drawableID != VectorLineDrawable.INVALID_ID) {
@@ -88,18 +119,9 @@ public class VectorLinePipeline : RenderPipeline {
                                 cachedData.m_materialProperties = new MaterialPropertyBlock();
                             }
 
-                            int idx = 0;
-                            foreach (VectorLineVertex vertex in drawable.GetVertices()) {
-                                if (idx >= ms_vertices.Length) {
-                                    Debug.LogError($"Drawable gave too many vertices!", drawable);
-                                    break;
-                                }
-
-                                ms_vertices[idx] = new Vertex(vertex);
-                                idx += 1;
-                            }
-
-                            Debug.Assert(idx == vertexCount, $"Drawable '{drawable}' returned incorrect number of vertices, expected {vertexCount}, got {idx}!", drawable);
+                            ms_vertexArray.Reset();
+                            drawable.GetVertices(ms_vertexArray);
+                            Debug.Assert(ms_vertexArray.currentVertex == vertexCount, $"Drawable '{drawable}' returned incorrect number of vertices, expected {vertexCount}, got {ms_vertexArray.currentVertex}!", drawable);
 
                             if (cachedData.m_vertexBuffer == null || cachedData.m_vertexBuffer.count != vertexCount) {
                                 cachedData.m_vertexBuffer?.Release();
@@ -107,7 +129,7 @@ public class VectorLinePipeline : RenderPipeline {
                                 cachedData.m_materialProperties.SetBuffer("vertices", cachedData.m_vertexBuffer);
                             }
 
-                            cachedData.m_vertexBuffer.SetData(ms_vertices, 0, 0, vertexCount);
+                            cachedData.m_vertexBuffer.SetData(ms_vertexArray.vertices, 0, 0, vertexCount);
 
                             m_cachedShapeData[drawableID] = cachedData;
                             dataAvailable = true;
@@ -118,13 +140,12 @@ public class VectorLinePipeline : RenderPipeline {
                     }
 
                     if (dataAvailable) {
-                        cameraCommandBuffer.DrawProcedural(drawable.transform.localToWorldMatrix, m_renderMaterial, 0, MeshTopology.Lines, cachedData.m_vertexBuffer.count, 1, cachedData.m_materialProperties);
+                        m_cameraCommandBuffer.DrawProcedural(drawable.transform.localToWorldMatrix, m_renderMaterial, 0, MeshTopology.Lines, cachedData.m_vertexBuffer.count, 1, cachedData.m_materialProperties);
                     }
                 }
             }
 
-            context.ExecuteCommandBuffer(cameraCommandBuffer);
-            cameraCommandBuffer.Release();
+            context.ExecuteCommandBuffer(m_cameraCommandBuffer);
 
 #if UNITY_EDITOR
             if (camera.cameraType == CameraType.SceneView) {
