@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 public class VectorLinePipeline : RenderPipeline {
     const int MAX_DRAWABLE_COUNT = 1024;
-    const int MAX_DRAWABLE_VERTEX_COUNT = 1024;
+    const int MAX_DRAWABLE_VERTEX_COUNT = 1024 * 1024;
     const int MAX_CAMERA_BUFFERS = 3;
 
     static VectorLineDrawable[] ms_drawableArray = new VectorLineDrawable[MAX_DRAWABLE_COUNT];
