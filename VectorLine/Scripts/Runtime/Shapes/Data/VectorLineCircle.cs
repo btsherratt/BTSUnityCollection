@@ -7,8 +7,10 @@ public partial struct VectorLineCircle {
     public Color color;
 
     public override int GetHashCode() {
-        return radius.GetHashCode()
-            ^ color.GetHashCode();
+        int h = 17;
+        h = (h * 31) ^ radius.GetHashCode();
+        h = (h * 31) ^ color.GetHashCode();
+        return h;
     }
 }
 

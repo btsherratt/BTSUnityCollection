@@ -6,8 +6,10 @@ public partial struct VectorLinePolygon {
     public VectorLineVertex[] vertices;
 
     public override int GetHashCode() {
-        return loop.GetHashCode()
-            ^ vertices.GetHashCode();
+        int h = 17;
+        h = (h * 31) ^ loop.GetHashCode();
+        h = (h * 31) ^ vertices.GetHashCode();
+        return h;
     }
 }
 

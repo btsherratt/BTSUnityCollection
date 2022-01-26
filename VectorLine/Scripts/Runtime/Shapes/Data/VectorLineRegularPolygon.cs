@@ -9,10 +9,12 @@ public partial struct VectorLineRegularPolygon {
     public Color color;
 
     public override int GetHashCode() {
-        return corners.GetHashCode()
-            ^ radius.GetHashCode()
-            ^ startAngle.GetHashCode()
-            ^ color.GetHashCode();
+        int h = 17;
+        h = (h * 31) ^ corners.GetHashCode();
+        h = (h * 31) ^ radius.GetHashCode();
+        h = (h * 31) ^ startAngle.GetHashCode();
+        h = (h * 31) ^ color.GetHashCode();
+        return h;
     }
 }
 

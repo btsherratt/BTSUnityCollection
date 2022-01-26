@@ -10,18 +10,20 @@ public partial struct VectorLineStar {
     public float startAngle;
     public float secondaryAngleRelativeOffset;
 
-    public Color color;
-
     public bool starburst;
 
+    public Color color;
+
     public override int GetHashCode() {
-        return points.GetHashCode()
-            ^ primaryRadius.GetHashCode()
-            ^ secondaryRadius.GetHashCode()
-            ^ startAngle.GetHashCode()
-            ^ secondaryAngleRelativeOffset.GetHashCode()
-            ^ color.GetHashCode()
-            ^ starburst.GetHashCode();
+        int h = 17;
+        h = (h * 31) ^ points.GetHashCode();
+        h = (h * 31) ^ primaryRadius.GetHashCode();
+        h = (h * 31) ^ secondaryRadius.GetHashCode();
+        h = (h * 31) ^ startAngle.GetHashCode();
+        h = (h * 31) ^ secondaryAngleRelativeOffset.GetHashCode();
+        h = (h * 31) ^ starburst.GetHashCode();
+        h = (h * 31) ^ color.GetHashCode();
+        return h;
     }
 }
 

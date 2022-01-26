@@ -8,9 +8,11 @@ public partial struct VectorLineRect {
     public Color color;
 
     public override int GetHashCode() {
-        return center.GetHashCode()
-            ^ size.GetHashCode()
-            ^ color.GetHashCode();
+        int h = 17;
+        h = (h * 31) ^ center.GetHashCode();
+        h = (h * 31) ^ size.GetHashCode();
+        h = (h * 31) ^ color.GetHashCode();
+        return h;
     }
 }
 
