@@ -99,6 +99,8 @@ public static class LODGen {
             indices.Add(startIdx + 0);
             indices.Add(startIdx + 1);
             indices.Add(startIdx + 2);
+            indices.Add(startIdx + 0);
+            indices.Add(startIdx + 2);
             indices.Add(startIdx + 3);
         }
 
@@ -125,7 +127,7 @@ public static class LODGen {
         mesh.SetVertices(vertices);
         mesh.SetNormals(normals);
         mesh.SetUVs(0, uvs);
-        mesh.SetIndices(indices, MeshTopology.Quads, 0);
+        mesh.SetIndices(indices, MeshTopology.Triangles, 0);
 
         BillboardDetails billboardDetails = new BillboardDetails();
         billboardDetails.albedo = albedoAtlas;
