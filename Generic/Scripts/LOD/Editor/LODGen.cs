@@ -19,7 +19,7 @@ public static class LODGen {
         directions.Add(Quaternion.LookRotation(Vector3.right));
 
         foreach (GameObject gameObject in Selection.gameObjects) {
-            BillboardDetails billboardDetails = GenerateBillboard(gameObject, directions.ToArray(), 1024, linearColorSpace);
+            BillboardDetails billboardDetails = GenerateBillboard(gameObject, directions.ToArray(), 1024, false, linearColorSpace);
 
             Scene previewScene = EditorSceneManager.NewPreviewScene();
 
@@ -69,7 +69,7 @@ public static class LODGen {
         public Mesh mesh;
     }
 
-    static BillboardDetails GenerateBillboard(GameObject gameObject, Quaternion[] rotations, int individualTextureSize, bool linearColorSpace) {
+    static BillboardDetails GenerateBillboard(GameObject gameObject, Quaternion[] rotations, int individualTextureSize, bool mipmaps, bool linearColorSpace) {
         List<Texture2D> albedoTextures = new List<Texture2D>();
         List<Vector3> vertices = new List<Vector3>();
         List<Vector3> normals = new List<Vector3>();
@@ -77,7 +77,7 @@ public static class LODGen {
 
         foreach (Quaternion rotation in rotations) {
             Bounds bounds;
-            Texture2D texture = GenerateBillboard(out bounds, gameObject, rotation, individualTextureSize, linearColorSpace);
+            Texture2D texture = GenerateBillboard(out bounds, gameObject, rotation, individualTextureSize, mipmaps, linearColorSpace);
             albedoTextures.Add(texture);
 
             int startIdx = vertices.Count;
@@ -112,7 +112,7 @@ public static class LODGen {
         Texture2D albedoAtlas = new Texture2D(atlasWidth, atlasHeight, k_TextureFormat, false, linearColorSpace);
         albedoAtlas.name = "Billboard Albedo Atlas";
 
-        Rect[] rects = albedoAtlas.PackTextures(albedoTextures.ToArray(), 0, Mathf.Max(atlasWidth, atlasHeight), true); // FIXME, need to smear this to the edges...
+        Rect[] rects = albedoAtlas.PackTextures(albedoTextures.ToArray(), 0, Mathf.Max(atlasWidth, atlasHeight)); // FIXME, need to smear this to the edges...
 
         List<Vector2> uvs = new List<Vector2>();
         foreach (Rect rect in rects) {
@@ -136,7 +136,7 @@ public static class LODGen {
         return billboardDetails;
     }
 
-    static Texture2D GenerateBillboard(out Bounds renderedBounds, GameObject gameObject, Quaternion rotation, int textureSize, bool linearColorSpace) {
+    static Texture2D GenerateBillboard(out Bounds renderedBounds, GameObject gameObject, Quaternion rotation, int textureSize, bool mipmaps, bool linearColorSpace) {
         Scene previewScene = EditorSceneManager.NewPreviewScene();
 
         GameObject subjectGameObject = (GameObject)PrefabUtility.InstantiatePrefab(gameObject, previewScene);
@@ -154,6 +154,7 @@ public static class LODGen {
         SceneManager.MoveGameObjectToScene(cameraGameObject, previewScene);
 
         Camera camera = cameraGameObject.GetComponent<Camera>();
+        camera.cameraType = CameraType.Preview;
         camera.enabled = false;
         camera.clearFlags = CameraClearFlags.Color | CameraClearFlags.Depth;
         camera.orthographic = true;
@@ -166,7 +167,7 @@ public static class LODGen {
         camera.transform.position = bounds.center;
         camera.transform.rotation = rotation;
 
-        Texture2D texture = camera.CaptureTexture(textureSize, linearColorSpace);
+        Texture2D texture = camera.CaptureTexture(textureSize, mipmaps, linearColorSpace);
         
         EditorSceneManager.ClosePreviewScene(previewScene);
 
@@ -174,7 +175,7 @@ public static class LODGen {
         return texture;
     }
 
-    static Texture2D CaptureTexture(this Camera camera, int textureSize, bool linearColorSpace) {
+    static Texture2D CaptureTexture(this Camera camera, int textureSize, bool mipmaps, bool linearColorSpace) {
         RenderTexture previousCameraRenderTexture = camera.targetTexture;
         RenderTexture previousRenderTexture = RenderTexture.active;
 
@@ -186,9 +187,9 @@ public static class LODGen {
 
         // TODO: Smear the colours for nicer edges...
 
-        Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false, linearColorSpace);
+        Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, mipmaps, linearColorSpace);
         texture.ReadPixels(new Rect(0, 0, textureSize, textureSize), 0, 0);
-        texture.Apply();
+        texture.Apply(true);
 
         RenderTexture.active = previousRenderTexture;
         camera.targetTexture = previousCameraRenderTexture;
