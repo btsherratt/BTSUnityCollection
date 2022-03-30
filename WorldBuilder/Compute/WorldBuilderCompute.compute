@@ -1,0 +1,79 @@
+#pragma kernel Culling
+
+struct Data {
+    float4 posScale;
+    float4 rotation;
+    float4 data;
+};
+
+//float3 _CameraPos;
+//float3 _LODBins;
+float4x4 _WorldToCamera;
+float2 _Heights;
+float _Size;
+float3 _LocalReferencePoint;
+float4x4 _MeshOffsetMatrix;
+
+StructuredBuffer<Data> _Input;
+AppendStructuredBuffer<float4x4> _Output;
+
+bool IsValidData(Data data) {
+    return data.posScale.w > 0.01;
+}
+
+float4x4 DataToMtx(Data data) {
+    float4x4 mtx2;
+    float4x4 mtx;
+
+    float4 p = float4(data.posScale.xyz, 1);
+    float4 q = data.rotation;
+    float s = data.posScale.w;
+
+    float x = q.x * 2.0;
+    float y = q.y * 2.0;
+    float z = q.z * 2.0;
+    float xx = q.x * x;
+    float yy = q.y * y;
+    float zz = q.z * z;
+    float xy = q.x * y;
+    float xz = q.x * z;
+    float yz = q.y * z;
+    float wx = q.w * x;
+    float wy = q.w * y;
+    float wz = q.w * z;
+
+    mtx._11_21_31_41 = float4(1.0 - (yy + zz),        xy + wz ,        xz - wy , 0);
+    mtx._12_22_32_42 = float4(       xy - wz , 1.0 - (xx + zz),        yz + wx , 0);
+    mtx._13_23_33_43 = float4(       xz + wy ,        yz - wx , 1.0 - (xx + yy), 0);
+    mtx *= s;
+    mtx._14_24_34_44 = p;
+
+    //mtx = mul(mtx, _MeshOffsetMatrix);
+
+    return mtx;
+}
+
+[numthreads(256, 1, 1)]
+void Culling(uint3 id : SV_DispatchThreadID) {
+    for (int i = 0; i < 256; ++i) {
+        uint idx = id.x * 256 + i;
+
+        Data data = _Input[idx];
+        if (IsValidData(data)) {
+            float4x4 mtx = DataToMtx(data);
+
+            float4 p1 = mul(_WorldToCamera, mul(mtx, float4(_LocalReferencePoint, 1)));
+            p1 /= p1.w;
+
+            float4 p2 = mul(_WorldToCamera, mul(mtx, float4(_LocalReferencePoint + _Size, 1)));
+            p2 /= p2.w;
+
+            float height = distance(p1, p2);
+            //float scale = data.posScale.w;
+            if (height < (_Heights.x) && height >= (_Heights.y)) {
+                mtx = mul(mtx, _MeshOffsetMatrix);
+                _Output.Append(mtx);
+            }
+        }
+    }
+}
