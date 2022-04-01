@@ -9,11 +9,13 @@ public class Spline : MonoBehaviour {
 
     public struct SplinePoint {
         public Vector3 position;
+        public Vector3 forward;
         public float distance;
         public float worldDistance;
 
-        public SplinePoint(Vector3 position, float distance, float worldDistance) {
+        public SplinePoint(Vector3 position, Vector3 forward, float distance, float worldDistance) {
             this.position = position;
+            this.forward = forward.normalized;
             this.distance = distance;
             this.worldDistance = worldDistance;
         }
@@ -76,7 +78,7 @@ public class Spline : MonoBehaviour {
         public SplinePoint[] Generate(out Bounds bounds, out float length, float tolerance, int maxSteps, SplinePoint[] pointBuffer) {
             SplinePoint[] points = pointBuffer;
 
-            points[0] = new SplinePoint(Lerp(0.0f), 0, 0);
+            points[0] = new SplinePoint(Lerp(0.0f), Vector3.forward, 0, 0);
 
             bounds = new Bounds(points[0].position, Vector3.zero);
 
@@ -90,7 +92,9 @@ public class Spline : MonoBehaviour {
                     Vector3 position = Lerp(t);
                     float distance = Vector3.Distance(previousPosition, position);
                     currentLength += distance;
-                    points[i] = new SplinePoint(position, t, currentLength);
+                    Vector3 forward = points[i - 1].position - position;
+                    points[i] = new SplinePoint(position, forward, t, currentLength);
+
                     bounds.Encapsulate(position);
                     previousPosition = position;
                 }
@@ -101,6 +105,8 @@ public class Spline : MonoBehaviour {
                     break;
                 }
             }
+
+            points[0].forward = -(points[1].position - points[0].position).normalized;
 
             length = previousLength;
 
@@ -139,6 +145,10 @@ public class Spline : MonoBehaviour {
     float m_cachedLength;
 
     public Vector3 Lerp(float t, Units units) {
+        return Lerp(out _, t, units);
+    }
+    
+    public Vector3 Lerp(out Vector3 forward, float t, Units units) {
         CacheSpline();
 
         float relativeToSegmentT = 0.0f;
@@ -170,13 +180,32 @@ public class Spline : MonoBehaviour {
         }
 
         if (relativeToSegmentT <= 0) {
+            forward = m_cachedSpline[0].points[0].forward;
             return m_controlPoints[0];
         } else if (relativeToSegmentT >= m_controlPoints.Length) {
+            forward = m_cachedSpline[0].points[0].forward; // FIXME, WRONG THING
             return m_controlPoints[m_controlPoints.Length - 1];
         } else {
             int idx = Mathf.FloorToInt(relativeToSegmentT);
-            Interpolater interpolater = SegmentInterpolater(idx);
-            return interpolater.Lerp(relativeToSegmentT - idx);
+            relativeToSegmentT -= idx;
+            SplineSegment segment = m_cachedSpline[idx];
+
+            int pointIdx = 0;
+            for (; pointIdx < segment.points.Length - 2; ++pointIdx) {
+                float length = segment.points[pointIdx + 1].distance; // FIXME, confusing...
+                if (relativeToSegmentT < length) {
+                    break;
+                } else {
+                   // relativeToSegmentT -= length;
+                }
+            }
+
+            float pt = relativeToSegmentT / segment.points[pointIdx].distance;
+            forward = Vector3.Lerp(segment.points[pointIdx].forward, segment.points[pointIdx + 1].forward, pt);
+            return Vector3.Lerp(segment.points[pointIdx].position, segment.points[pointIdx + 1].position, pt);
+
+            //Interpolater interpolater = SegmentInterpolater(idx);
+            //return interpolater.Lerp(relativeToSegmentT - idx);
         }
     }
 

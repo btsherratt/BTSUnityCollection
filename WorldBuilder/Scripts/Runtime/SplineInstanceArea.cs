@@ -57,10 +57,12 @@ namespace SKFX.WorldBuilder {
 #endif
 
         protected override Vector3 RandomPointInArea() {
-            Vector3 point = m_spline.Lerp(Random.Range(0.0f, m_spline.Length), Spline.Units.World);
+            Vector3 forward;
+            Vector3 point = m_spline.Lerp(out forward, Random.Range(0.0f, m_spline.Length), Spline.Units.World);
             //point = transform.TransformPoint(point);
             // FIXME, offset
             point = m_spline.transform.TransformPoint(point);
+            point += Vector3.Cross(forward, Vector3.up) * Random.Range(-m_width / 2.0f, m_width / 2.0f);
             return point;
         }
 
