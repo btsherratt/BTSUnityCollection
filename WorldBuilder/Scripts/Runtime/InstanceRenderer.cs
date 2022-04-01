@@ -84,7 +84,14 @@ namespace SKFX.WorldBuilder {
 
         void TryDraw(Camera camera) {
             if (camera != null && (camera.cameraType == CameraType.Game || camera.cameraType == CameraType.SceneView)) {
-                m_computeShader.SetMatrix("_WorldToCamera", camera.projectionMatrix * camera.worldToCameraMatrix);
+                Camera detailsCamera = (Application.isPlaying && camera.cameraType == CameraType.SceneView) ? Camera.main : camera;
+
+                Vector4 cameraDetails1 = detailsCamera.transform.position;
+                Vector4 cameraDetails2 = new Vector4(detailsCamera.nearClipPlane, detailsCamera.farClipPlane, detailsCamera.fieldOfView * Mathf.Deg2Rad, QualitySettings.lodBias);
+                Vector4 cameraDetails3 = detailsCamera.transform.forward;
+                m_computeShader.SetVectorArray("_CameraDetails", new Vector4[] { cameraDetails1, cameraDetails2, cameraDetails3 });
+
+//                detailsCamera.fr
 
                 if (m_commandBuffer == null) {
                     Setup();
@@ -116,81 +123,182 @@ namespace SKFX.WorldBuilder {
 
             m_drawData = new List<DrawData>();
 
+
+            Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefabLOD = new Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>>();
+
+
             foreach (InstanceProvider instanceProvider in InstanceProvider.All(true)) {
                 foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
                     LODGroup prefabLODGroup = details.prefabConfiguration.m_prefab.GetComponent<LODGroup>();
                     if (prefabLODGroup != null) {
-                        //List<LODDrawData> allLODDrawData = new List<LODDrawData>();
-                        List<DrawPair> drawPairs = new List<DrawPair>();
-
-                        LOD[] prefabLODs = prefabLODGroup.GetLODs();
-                        float lastTransitionHeight = float.PositiveInfinity;
-                        for (int i = 0; i < prefabLODs.Length; ++i) {
-                            LOD prefabLOD = prefabLODs[i];
-
-                            float nextTransitionHeight = i < prefabLODs.Length - 2 ? prefabLODs[i + 1].screenRelativeTransitionHeight : 0;
-
-                            foreach (Renderer renderer in prefabLOD.renderers) {
-                                MeshFilter mf = renderer.GetComponent<MeshFilter>();
-                                if (mf != null) {
-                                    for (int submeshIdx = 0; submeshIdx < renderer.sharedMaterials.Length; ++submeshIdx) {
-                                        DrawPair drawPair = new DrawPair();
-                                        drawPair.material = new Material(renderer.sharedMaterials[submeshIdx]);
-                                        drawPair.material.EnableKeyword("SKFX_WB_INSTANCING_ENABLED");
-                                        drawPair.mesh = mf.sharedMesh;
-                                        drawPair.submeshIndex = submeshIdx;
-                                        drawPair.matrix = details.prefabConfiguration.m_prefab.transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
-                                        // drawPair.material.SetMatrix("_MeshOffsetMatrix", drawPair.matrix);
-                                        //drawPair.screenRelativeTransitionHeights = new Vector2(prefabLOD.screenRelativeTransitionHeight, nextTransitionHeight);
-                                        drawPair.screenRelativeTransitionHeights = new Vector2(lastTransitionHeight, prefabLOD.screenRelativeTransitionHeight);
-                                        drawPair.size = prefabLODGroup.size;
-                                        drawPair.localReferencePoint = prefabLODGroup.localReferencePoint;
-
-                                        drawPairs.Add(drawPair);
-                                    }
-                                }
-                            }
-
-                            lastTransitionHeight = prefabLOD.screenRelativeTransitionHeight;
+                        List<InstanceProvider.InstanceDetails> instanceDetails;
+                        if (instanceDetailsByPrefabLOD.TryGetValue(prefabLODGroup, out instanceDetails) == false) {
+                            instanceDetails = new List<InstanceProvider.InstanceDetails>();
+                            instanceDetailsByPrefabLOD[prefabLODGroup] = instanceDetails;
                         }
-
-                        if (drawPairs.Count > 0) {
-                            DrawData drawData = new DrawData();
-                            drawData.drawPairs = drawPairs.ToArray();
-
-                            int roundedElements = Mathf.CeilToInt((float)details.DetailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
-                            drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, InstanceDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
-
-                            InstanceDetails[] allInstanceDetails = new InstanceDetails[roundedElements];
-                            int count = 0;
-                            foreach (TransformDetails transformDetails in details.GenerateSnappedDetails(1 << instanceProvider.m_snapLayer)) {
-                                InstanceDetails instanceDetails = new InstanceDetails();
-                                instanceDetails.position = transformDetails.position;
-                                instanceDetails.rotation = transformDetails.rotation;
-                                instanceDetails.uniformScale = transformDetails.uniformScale;
-                                instanceDetails.instanceData = new Vector4();
-                                allInstanceDetails[count++] = instanceDetails;
-                            }
-                            drawData.unculledDataBuffer.SetData(allInstanceDetails);
-
-                            uint[] args = new uint[drawPairs.Count * 5];
-                            for (int i = 0; i < drawPairs.Count; ++i) {
-                                int baseIdx = i * 5;
-                                args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
-                                args[baseIdx + 1] = (uint)0;
-                                args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
-                                args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
-                            }
-
-                            drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
-                            drawData.indirectArguments.SetData(args);
-
-                            drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
-
-                            m_drawData.Add(drawData);
-                        }
+                        instanceDetails.Add(details);
                     }
                 }
+            }
+
+
+            foreach (var pair in instanceDetailsByPrefabLOD) {
+                LODGroup prefabLODGroup = pair.Key;
+                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+
+                List<DrawPair> drawPairs = new List<DrawPair>();
+
+                LOD[] prefabLODs = prefabLODGroup.GetLODs();
+                float lastTransitionHeight = float.PositiveInfinity;
+                for (int i = 0; i < prefabLODs.Length; ++i) {
+                    LOD prefabLOD = prefabLODs[i];
+
+                    float nextTransitionHeight = i < prefabLODs.Length - 2 ? prefabLODs[i + 1].screenRelativeTransitionHeight : 0;
+
+                    foreach (Renderer renderer in prefabLOD.renderers) {
+                        MeshFilter mf = renderer.GetComponent<MeshFilter>();
+                        if (mf != null) {
+                            for (int submeshIdx = 0; submeshIdx < renderer.sharedMaterials.Length; ++submeshIdx) {
+                                DrawPair drawPair = new DrawPair();
+                                drawPair.material = new Material(renderer.sharedMaterials[submeshIdx]);
+                                drawPair.material.EnableKeyword("SKFX_WB_INSTANCING_ENABLED");
+                                drawPair.mesh = mf.sharedMesh;
+                                drawPair.submeshIndex = submeshIdx;
+                                //drawPair.matrix = details.prefabConfiguration.m_prefab.transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
+                                drawPair.matrix = prefabLODGroup.transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix; // FIXME!!!!
+                                // drawPair.material.SetMatrix("_MeshOffsetMatrix", drawPair.matrix);
+                                //drawPair.screenRelativeTransitionHeights = new Vector2(prefabLOD.screenRelativeTransitionHeight, nextTransitionHeight);
+                                drawPair.screenRelativeTransitionHeights = new Vector2(lastTransitionHeight, prefabLOD.screenRelativeTransitionHeight);
+                                drawPair.size = prefabLODGroup.size;
+                                drawPair.localReferencePoint = prefabLODGroup.localReferencePoint;
+
+                                drawPairs.Add(drawPair);
+                            }
+                        }
+                    }
+
+                    lastTransitionHeight = prefabLOD.screenRelativeTransitionHeight;
+                }
+
+                DrawData drawData = new DrawData();
+                drawData.drawPairs = drawPairs.ToArray();
+
+                long detailsCount = 0;
+                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                    detailsCount += details.DetailsCount;
+                }
+
+                int roundedElements = Mathf.CeilToInt((float)detailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
+                drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, InstanceDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+
+                InstanceDetails[] allInstanceDetails = new InstanceDetails[roundedElements];
+                int count = 0;
+
+                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                    foreach (TransformDetails transformDetails in details.GenerateSnappedDetails()) {
+                        InstanceDetails d = new InstanceDetails();
+                        d.position = transformDetails.position;
+                        d.rotation = transformDetails.rotation;
+                        d.uniformScale = transformDetails.uniformScale;
+                        d.instanceData = new Vector4();
+                        allInstanceDetails[count++] = d;
+                    }
+                }
+                drawData.unculledDataBuffer.SetData(allInstanceDetails);
+
+                uint[] args = new uint[drawPairs.Count * 5];
+                for (int i = 0; i < drawPairs.Count; ++i) {
+                    int baseIdx = i * 5;
+                    args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
+                    args[baseIdx + 1] = (uint)0;
+                    args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
+                    args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
+                }
+
+                drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
+                drawData.indirectArguments.SetData(args);
+
+                drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
+
+                m_drawData.Add(drawData);
+
+                /*
+                foreach (InstanceProvider instanceProvider in InstanceProvider.All(true)) {
+                    foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
+                        LODGroup prefabLODGroup = details.prefabConfiguration.m_prefab.GetComponent<LODGroup>();
+                        if (prefabLODGroup != null) {
+                            //List<LODDrawData> allLODDrawData = new List<LODDrawData>();
+                            List<DrawPair> drawPairs = new List<DrawPair>();
+
+                            LOD[] prefabLODs = prefabLODGroup.GetLODs();
+                            float lastTransitionHeight = float.PositiveInfinity;
+                            for (int i = 0; i < prefabLODs.Length; ++i) {
+                                LOD prefabLOD = prefabLODs[i];
+
+                                float nextTransitionHeight = i < prefabLODs.Length - 2 ? prefabLODs[i + 1].screenRelativeTransitionHeight : 0;
+
+                                foreach (Renderer renderer in prefabLOD.renderers) {
+                                    MeshFilter mf = renderer.GetComponent<MeshFilter>();
+                                    if (mf != null) {
+                                        for (int submeshIdx = 0; submeshIdx < renderer.sharedMaterials.Length; ++submeshIdx) {
+                                            DrawPair drawPair = new DrawPair();
+                                            drawPair.material = new Material(renderer.sharedMaterials[submeshIdx]);
+                                            drawPair.material.EnableKeyword("SKFX_WB_INSTANCING_ENABLED");
+                                            drawPair.mesh = mf.sharedMesh;
+                                            drawPair.submeshIndex = submeshIdx;
+                                            drawPair.matrix = details.prefabConfiguration.m_prefab.transform.worldToLocalMatrix * renderer.transform.localToWorldMatrix;
+                                            // drawPair.material.SetMatrix("_MeshOffsetMatrix", drawPair.matrix);
+                                            //drawPair.screenRelativeTransitionHeights = new Vector2(prefabLOD.screenRelativeTransitionHeight, nextTransitionHeight);
+                                            drawPair.screenRelativeTransitionHeights = new Vector2(lastTransitionHeight, prefabLOD.screenRelativeTransitionHeight);
+                                            drawPair.size = prefabLODGroup.size;
+                                            drawPair.localReferencePoint = prefabLODGroup.localReferencePoint;
+
+                                            drawPairs.Add(drawPair);
+                                        }
+                                    }
+                                }
+
+                                lastTransitionHeight = prefabLOD.screenRelativeTransitionHeight;
+                            }
+
+                            if (drawPairs.Count > 0) {
+                                DrawData drawData = new DrawData();
+                                drawData.drawPairs = drawPairs.ToArray();
+
+                                int roundedElements = Mathf.CeilToInt((float)details.DetailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
+                                drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, InstanceDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+
+                                InstanceDetails[] allInstanceDetails = new InstanceDetails[roundedElements];
+                                int count = 0;
+                                foreach (TransformDetails transformDetails in details.GenerateSnappedDetails(1 << instanceProvider.m_snapLayer)) {
+                                    InstanceDetails instanceDetails = new InstanceDetails();
+                                    instanceDetails.position = transformDetails.position;
+                                    instanceDetails.rotation = transformDetails.rotation;
+                                    instanceDetails.uniformScale = transformDetails.uniformScale;
+                                    instanceDetails.instanceData = new Vector4();
+                                    allInstanceDetails[count++] = instanceDetails;
+                                }
+                                drawData.unculledDataBuffer.SetData(allInstanceDetails);
+
+                                uint[] args = new uint[drawPairs.Count * 5];
+                                for (int i = 0; i < drawPairs.Count; ++i) {
+                                    int baseIdx = i * 5;
+                                    args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
+                                    args[baseIdx + 1] = (uint)0;
+                                    args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
+                                    args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
+                                }
+
+                                drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
+                                drawData.indirectArguments.SetData(args);
+
+                                drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
+
+                                m_drawData.Add(drawData);
+                            }
+                        }
+                    }
+                */
             }
         }
 

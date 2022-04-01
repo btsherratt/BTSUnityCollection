@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
 
-[ExecuteInEditMode]
 public class Spline : MonoBehaviour
 {
     struct Interpolater
@@ -91,6 +90,8 @@ public class Spline : MonoBehaviour
         }
     }
 
+    public Vector3[] controlPoints;
+
     [Range(0.0f, 1.0f)]
     public float alpha = 0.5f;
 
@@ -98,7 +99,10 @@ public class Spline : MonoBehaviour
     public float lengthTolerance = 0.01f;
     public int lengthMaximumDepth = 200;
 
-    Vector3[] controlPoints;
+    public delegate void SplineUpdateEvent(Spline spline);
+    public static event SplineUpdateEvent ms_updateEvent;
+
+    public float Length => length;
 
     float[] segmentLengths;
     float length;
@@ -136,7 +140,7 @@ public class Spline : MonoBehaviour
         switch (units)
         {
             case Units.ZeroToOne:
-                relativeToSegmentT = t * (controlPoints.Length - 2); // FIXME, this isn't correct
+                relativeToSegmentT = t * (controlPoints.Length - 2) + 1; // FIXME, this isn't correct
                 break;
 
             case Units.ZeroToSegments:
@@ -193,7 +197,7 @@ public class Spline : MonoBehaviour
 
     private void OnValidate()
     {
-       // GenerateAndUpdate();
+       GenerateAndUpdate();
     }
 
 
@@ -204,9 +208,8 @@ public class Spline : MonoBehaviour
             cachedSpline = GenerateSpline();
         }
 
-        for (int i = 1; i < cachedSpline.Length; ++i)
-        {
-            Gizmos.DrawLine(cachedSpline[i - 1].position, cachedSpline[i].position);
+        for (int i = 1; i < cachedSpline.Length; ++i) {
+            Gizmos.DrawLine(transform.TransformPoint(  cachedSpline[i - 1].position), transform.TransformPoint(cachedSpline[i].position));
         }
     }
 
@@ -215,17 +218,13 @@ public class Spline : MonoBehaviour
     {
         cachedSpline = GenerateSpline();
 
-        SplineModel[] models = GetComponents<SplineModel>();
-        foreach (SplineModel model in models)
-        {
-            model.Generate(cachedSpline);
+        if (ms_updateEvent != null) {
+            ms_updateEvent(this);
         }
     }
 
     public SplinePoint[] GenerateSpline()
     {
-        FindControlPoints();
-
         int numSegments = controlPoints.Length - 3;
         SplinePoint[] spline = new SplinePoint[numSegments * lengthMaximumDepth];
 
@@ -246,23 +245,10 @@ public class Spline : MonoBehaviour
 
         // FIXME, better memory?
         SplinePoint[] splineSlice = new SplinePoint[splinePoints];
-        for (int i = 0; i < splineSlice.Length; ++i)
-        {
+        for (int i = 0; i < splineSlice.Length; ++i) {
             splineSlice[i] = spline[i];
         }
 
         return splineSlice;
     }
-
-
-    private void FindControlPoints()
-    {
-        controlPoints = new Vector3[transform.childCount];
-        for (int i = 0; i < controlPoints.Length; ++i)
-        {
-            controlPoints[i] = transform.GetChild(i).position;
-        }
-    }
-
-
 }

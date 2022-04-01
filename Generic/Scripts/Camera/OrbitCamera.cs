@@ -11,6 +11,8 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
     public float m_anglePerSecond = 360.0f;
     public float m_autoAnglePerSecond = 10.0f;
 
+    public bool m_invertedXControls = true;
+
     float m_angle = 0;
 
     PlayerInput m_playerInput;
@@ -37,7 +39,7 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
     void ICameraPositionProviding.UpdateCameraValues() {
         Vector2 lookDelta = m_lookAction.ReadValue<Vector2>();
         if (Mathf.Abs(lookDelta.x) >= float.Epsilon) {
-            m_angle += lookDelta.x * m_anglePerSecond * Time.deltaTime;
+            m_angle += (m_invertedXControls ? -lookDelta.x : lookDelta.x) * m_anglePerSecond * Time.deltaTime;
         } else {
             //m_angle = Mathf.MoveTowardsAngle(m_angle, m_followTarget.transform.eulerAngles.y + 180, m_autoAnglePerSecond * Time.deltaTime);
         }

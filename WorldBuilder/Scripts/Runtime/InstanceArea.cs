@@ -5,68 +5,39 @@ namespace SKFX.WorldBuilder {
     public abstract class InstanceArea : MonoBehaviour {
         const int kInstancesPerUnit = 10;
 
-        protected struct Triangle {
-            public Vector3 p0;
-            public Vector3 p1;
-            public Vector3 p2;
+        public delegate void ChangeEvent(InstanceArea instanceArea);
+        public static event ChangeEvent ms_changeEvent;
 
-            public Vector3 normal { get; private set; }
-            public Vector3 forward { get; private set; }
 
-            public float area { get; private set; }
 
-            Vector3 deltaA;
-            Vector3 deltaB;
 
-            public Triangle(Vector3 p0, Vector3 p1, Vector3 p2) {
-                this.p0 = p0;
-                this.p1 = p1;
-                this.p2 = p2;
 
-                deltaA = p0 - p2;
-                deltaB = p1 - p2;
 
-                Vector3 cross = Vector3.Cross(deltaA, deltaB);
-                normal = cross.normalized;
-                forward = deltaA.normalized;
 
-                area = cross.magnitude / 2.0f;
-            }
 
-            public Vector3 RandomPoint() {
-                float rndA = Random.value;
-                float rndB = Random.value;
-
-                Vector3 position;
-                if (rndA + rndB <= 1.0f) {
-                    Vector3 rnd = deltaA * rndA + deltaB * rndB;
-                    position = p2 + rnd;
-                } else {
-                    Vector3 rnd = deltaA * rndA + deltaB * rndB;
-                    position = p2 + deltaA + deltaB - rnd;
-                }
-
-                return position;
-            }
-        }
-
-        class TriangleTransformDetailsProvider : ITransformDetailsProviding {
-            List<Triangle> m_triangleList;
+        class InstanceAreaTransformDetailsProvider : ITransformDetailsProviding {
+            List<InstanceArea> m_additiveAreas;
+            List<InstanceArea> m_subtractiveAreas;
             float m_totalArea;
             long m_instanceCount;
             int m_seed;
 
             public long DetailsCount => m_instanceCount;
 
-            public TriangleTransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed) {
-                m_triangleList = new List<Triangle>();
-                foreach (InstanceArea area in additiveAreas) {
-                    m_triangleList.AddRange(area.GetTriangles());
+            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, int seed) {
+                m_additiveAreas = new List<InstanceArea>();
+                m_subtractiveAreas = new List<InstanceArea>();
+                foreach (InstanceArea area in areas) {
+                    if (area.m_operation == Operation.Additive) {
+                        m_additiveAreas.Add(area);
+                    } else {
+                        m_subtractiveAreas.Add(area);
+                    }
                 }
 
                 m_totalArea = 0;
-                foreach (Triangle t in m_triangleList) {
-                    m_totalArea += t.area;
+                foreach (InstanceArea instanceArea in m_additiveAreas) {
+                    m_totalArea += instanceArea.Area;
                 }
 
                 m_instanceCount = Mathf.FloorToInt(Mathf.Lerp(0, kInstancesPerUnit * Mathf.Sqrt(m_totalArea), density));
@@ -80,27 +51,41 @@ namespace SKFX.WorldBuilder {
                 for (int i = 0; i < m_instanceCount; ++i) {
                     float random = Random.Range(0, m_totalArea);
 
-                    Triangle selectedTriangle = new Triangle();
-                    foreach (Triangle t in m_triangleList) {
-                        selectedTriangle = t;
-                        random -= t.area;
+                    InstanceArea selectedArea = null;
+                    foreach (InstanceArea instanceArea in m_additiveAreas) {
+                        selectedArea = instanceArea;
+                        random -= instanceArea.Area;
                         if (random <= 0) {
                             break;
                         }
                     }
 
+                    Vector3 point;
+                    bool badPosition;
+                    do {
+                        point = selectedArea.RandomPointInArea();
+
+                        badPosition = false;
+                        foreach (InstanceArea instanceArea in m_subtractiveAreas) {
+                            if (instanceArea.TestPointInArea(point)) {
+                                badPosition = true;
+                                break;
+                            }
+                        }
+                    } while (badPosition);
+
                     TransformDetails details = new TransformDetails();
-                    details.position = selectedTriangle.RandomPoint();
-                    details.rotation = Quaternion.LookRotation(selectedTriangle.forward, selectedTriangle.normal);
+                    details.position = point;
+                    details.rotation = Quaternion.identity;// LookRotation(selectedTriangle.forward, selectedTriangle.normal);
                     details.uniformScale = 1.0f;
 
-                    Random.State currentState = Random.state;
-                    Random.state = oldState;
+                    //                  Random.State currentState = Random.state;
+                    //                  Random.state = oldState;
 
                     yield return details;
 
-                    oldState = Random.state;
-                    Random.state = currentState;
+                    //                 oldState = Random.state;
+                    //                  Random.state = currentState;  fixme, is this safe really?? (no)
                 }
 
                 Random.state = oldState;
@@ -118,7 +103,7 @@ namespace SKFX.WorldBuilder {
 
                     if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
                         snappedDetails.position = hit.point;
-                        snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal) * Quaternion.Euler(0, Random.Range(0.0f, 360.0f), 0); // FIXME, seed
+                        snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
                     }
 
                     /*if (Physics.Raycast(details.position + normal * 3000, -normal, out hit, float.MaxValue, snapLayerMask)) {
@@ -134,19 +119,46 @@ namespace SKFX.WorldBuilder {
             }
         }
 
-        public delegate void ChangeEvent(InstanceArea instanceArea);
-        public static event ChangeEvent ms_changeEvent;
+
+
+
+
+
+
 
         public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed) {
-            return new TriangleTransformDetailsProvider(additiveAreas, density, seed);
+            return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed);
         }
 
+        public enum Operation {
+            Additive,
+            Subtractive
+        }
+
+        public Operation m_operation;
+
         protected void OnValidate() {
+            SendChangeEvent();
+        }
+
+        protected void SendChangeEvent() {
             if (ms_changeEvent != null) {
                 ms_changeEvent(this);
             }
         }
 
-        protected abstract IEnumerable<Triangle> GetTriangles();
+        protected abstract float Area { get; }
+        protected abstract Vector3 RandomPointInArea();
+        protected abstract bool TestPointInArea(Vector3 point);
+
+        /*void OnDrawGizmos() {
+            foreach (Triangle triangle in GetTriangles()) {
+                Gizmos.DrawLine(triangle.p0, triangle.p1);
+                Gizmos.DrawLine(triangle.p1, triangle.p2);
+                Gizmos.DrawLine(triangle.p2, triangle.p0);
+            }
+        }*/
+
+        //protected abstract IEnumerable<Triangle> GetTriangles();
     }
 }

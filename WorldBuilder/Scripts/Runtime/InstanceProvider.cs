@@ -14,16 +14,22 @@ namespace SKFX.WorldBuilder {
             [MinMax(0.01f, 5.0f)]
             public Vector2 m_scale = Vector2.one;
 
+            public bool m_randomXRotation = false;
+            public bool m_randomYRotation = true;
+            public bool m_randomZRotation = false;
+
             public AnimationCurve m_scaleCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
         }
 
         public struct InstanceDetails : ITransformDetailsProviding {
             public InstancePrefabConfiguration prefabConfiguration;
             ITransformDetailsProviding transformDetailsProvider;
+            int snapLayerMask;
 
-            public InstanceDetails(InstancePrefabConfiguration prefabConfiguration, ITransformDetailsProviding transformDetailsProvider) {
+            public InstanceDetails(InstancePrefabConfiguration prefabConfiguration, ITransformDetailsProviding transformDetailsProvider, int snapLayerMask) {
                 this.prefabConfiguration = prefabConfiguration;
                 this.transformDetailsProvider = transformDetailsProvider;
+                this.snapLayerMask = snapLayerMask;
             }
 
             public long DetailsCount => transformDetailsProvider.DetailsCount;
@@ -32,17 +38,31 @@ namespace SKFX.WorldBuilder {
                 foreach (TransformDetails td in transformDetailsProvider.GenerateDetails()) {
                     TransformDetails transformDetails = new TransformDetails();
                     transformDetails.position = td.position;
-                    transformDetails.rotation = td.rotation;
+
+                    float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    transformDetails.rotation = td.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
+
                     transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
                     yield return transformDetails;
                 }
+            }
+
+            public IEnumerable<TransformDetails> GenerateSnappedDetails() {
+                return GenerateSnappedDetails(snapLayerMask);
             }
 
             public IEnumerable<TransformDetails> GenerateSnappedDetails(int snapLayerMask) {
                 foreach (TransformDetails td in transformDetailsProvider.GenerateSnappedDetails(snapLayerMask)) {
                     TransformDetails transformDetails = new TransformDetails();
                     transformDetails.position = td.position;
-                    transformDetails.rotation = td.rotation;
+
+                    float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
+                    transformDetails.rotation = td.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
+
                     transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
                     yield return transformDetails;
                 }
@@ -50,6 +70,7 @@ namespace SKFX.WorldBuilder {
         }
 
         public int m_seed;
+
         public List<InstancePrefabConfiguration> m_prefabConfigurations;
 
         [Layer]
@@ -59,12 +80,12 @@ namespace SKFX.WorldBuilder {
         public static event ChangeEvent ms_changeEvent;
 
         public IEnumerable<InstanceDetails> GenerateInstanceDetails() {
-            InstanceArea[] additiveAreas = GetComponents<InstanceArea>();
+            InstanceArea[] areas = GetComponents<InstanceArea>();
 
             int seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {
-                ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(additiveAreas, configuration.m_density, seed);
-                InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider);
+                ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed);
+                InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider, 1 << m_snapLayer);
                 yield return details;
                 ++seed;
             }
