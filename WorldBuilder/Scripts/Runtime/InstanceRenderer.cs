@@ -188,39 +188,41 @@ namespace SKFX.WorldBuilder {
                     detailsCount += details.DetailsCount;
                 }
 
-                int roundedElements = Mathf.CeilToInt((float)detailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
-                drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, InstanceDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+                if (detailsCount > 0) {
+                    int roundedElements = Mathf.CeilToInt((float)detailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
+                    drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, InstanceDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
 
-                InstanceDetails[] allInstanceDetails = new InstanceDetails[roundedElements];
-                int count = 0;
+                    InstanceDetails[] allInstanceDetails = new InstanceDetails[roundedElements];
+                    int count = 0;
 
-                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
-                    foreach (TransformDetails transformDetails in details.GenerateSnappedDetails()) {
-                        InstanceDetails d = new InstanceDetails();
-                        d.position = transformDetails.position;
-                        d.rotation = transformDetails.rotation;
-                        d.uniformScale = transformDetails.uniformScale;
-                        d.instanceData = new Vector4();
-                        allInstanceDetails[count++] = d;
+                    foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                        foreach (TransformDetails transformDetails in details.GenerateSnappedDetails()) {
+                            InstanceDetails d = new InstanceDetails();
+                            d.position = transformDetails.position;
+                            d.rotation = transformDetails.rotation;
+                            d.uniformScale = transformDetails.uniformScale;
+                            d.instanceData = new Vector4();
+                            allInstanceDetails[count++] = d;
+                        }
                     }
+                    drawData.unculledDataBuffer.SetData(allInstanceDetails);
+
+                    uint[] args = new uint[drawPairs.Count * 5];
+                    for (int i = 0; i < drawPairs.Count; ++i) {
+                        int baseIdx = i * 5;
+                        args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
+                        args[baseIdx + 1] = (uint)0;
+                        args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
+                        args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
+                    }
+
+                    drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
+                    drawData.indirectArguments.SetData(args);
+
+                    drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
+
+                    m_drawData.Add(drawData);
                 }
-                drawData.unculledDataBuffer.SetData(allInstanceDetails);
-
-                uint[] args = new uint[drawPairs.Count * 5];
-                for (int i = 0; i < drawPairs.Count; ++i) {
-                    int baseIdx = i * 5;
-                    args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
-                    args[baseIdx + 1] = (uint)0;
-                    args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
-                    args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
-                }
-
-                drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
-                drawData.indirectArguments.SetData(args);
-
-                drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
-
-                m_drawData.Add(drawData);
 
                 /*
                 foreach (InstanceProvider instanceProvider in InstanceProvider.All(true)) {

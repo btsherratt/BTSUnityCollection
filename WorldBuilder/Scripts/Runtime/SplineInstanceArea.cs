@@ -5,7 +5,6 @@ namespace SKFX.WorldBuilder {
     [ExecuteInEditMode]
     public class SplineInstanceArea : InstanceArea {
         public Spline m_spline;
-        //public Vector3 m_center = Vector3.zero;
         public float m_width = 1.0f;
 
         protected override float Area => m_spline != null ? m_spline.Length * m_width : 0.0f;
@@ -59,16 +58,14 @@ namespace SKFX.WorldBuilder {
 
         protected override Vector3 RandomPointInArea() {
             Vector3 point = m_spline.Lerp(Random.Range(0.0f, m_spline.Length), Spline.Units.World);
-            point = transform.TransformPoint(point);
+            //point = transform.TransformPoint(point);
             // FIXME, offset
+            point = m_spline.transform.TransformPoint(point);
             return point;
         }
 
         protected override bool TestPointInArea(Vector3 point) {
-            return false;
-            float t = m_spline.ClosestPositionOnSpline(point, Spline.Units.World); // FIXME, best units??
-            Vector3 testT = m_spline.Lerp(t, Spline.Units.World);
-            return Vector3.Distance(testT, point) <= m_width;
+            return m_spline.TestDistanceToSpline(point, m_width);
         }
     }
 }

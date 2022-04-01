@@ -66,41 +66,17 @@ void Culling(uint3 id : SV_DispatchThreadID) {
             position /= position.w;
 
             float4 delta = position - float4(_CameraDetails[0].xyz, 1);
-            float forwardDot = dot(delta.xyz, _CameraDetails[2].xyz) ;// length(delta);
+            float forwardDot = dot(delta.xyz, _CameraDetails[2].xyz);
 
             if (forwardDot > 0) {
+                float distance = length(delta);
 
-                float frustrumHeight = 2.0 * forwardDot * tan(_CameraDetails[1].z * 0.5f);
+                float frustrumHeight = 2.0 * distance/*forwardDot*/ * tan(_CameraDetails[1].z * 0.5f); // FIXME, do the forward dot when we have frustrum culling
                 float height = (_Size * _CameraDetails[1].w * data.posScale.w) / frustrumHeight;
-
-                //float3 cameraPos = _WorldToCamera._14_24_34;
-                //float3 pos = data.posScale.xyz;
-
-                //float3 delta = pos - cameraPos;
-                //float length = 
-
-                //float4 factor = mtx._12_22_32_42
-
-                //float4 p1 = mul(_WorldToCamera, mul(mtx, float4(_LocalReferencePoint, 1)));
-                //p1 /= p1.w;
-
-                //float4 zzz = mul(_WorldToCamera, mul(mtx, float4(_Size, _Size, _Size, 1)));
-                //zzz /= zzz.w;
-                //float xxx = length(zzz);
-
-                //if (delta.z >= 0 && dist < 1000) {
-                    //float4 p2 = mul(_WorldToCamera, mul(mtx, float4(_LocalReferencePoint + _Size, 1)));
-                    //p2 /= p2.w;
-
-                    //float height = distance(p1, p2);
-                    //float scale = data.posScale.w;
                 if (height <= (_Heights.x) && height >= (_Heights.y)) {
                     mtx = mul(mtx, _MeshOffsetMatrix);
-                    //float dot = dot()
-                    //if (dot > 0.1 && dot < 0.3) {
                     _Output.Append(mtx);
                 }
-                //}
             }
         }
     }

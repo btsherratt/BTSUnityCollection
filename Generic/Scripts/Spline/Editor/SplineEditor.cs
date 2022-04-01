@@ -31,7 +31,7 @@ public class SplineEditor : Editor {
 
         if (m_editing) {
 
-            SerializedProperty pointsProperty = serializedObject.FindProperty("controlPoints");
+            SerializedProperty pointsProperty = serializedObject.FindProperty("m_controlPoints");
 
             for (int i = 0; i < pointsProperty.arraySize; ++i) {
                 SerializedProperty pointProperty = pointsProperty.GetArrayElementAtIndex(i);
@@ -59,14 +59,14 @@ public class SplineEditor : Editor {
         Handles.BeginGUI();
         GUILayout.BeginHorizontal();
         GUILayout.FlexibleSpace();
-        m_editing = GUILayout.Toggle(m_editing, "Edit Area", "Button");
+        m_editing = GUILayout.Toggle(m_editing, "Edit Points", "Button");
         //m_showPoints = GUILayout.Toggle(m_showPoints, "Debug Points", "Button");
         GUILayout.FlexibleSpace();
         GUILayout.EndHorizontal();
         Handles.EndGUI();
 
         if (m_editing) {
-            SerializedProperty pointsProperty = serializedObject.FindProperty("controlPoints");
+            SerializedProperty pointsProperty = serializedObject.FindProperty("m_controlPoints");
 
             // Override being able to click anywhere else...
             HandleUtility.AddDefaultControl(0);

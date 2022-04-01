@@ -28,10 +28,12 @@ namespace SKFX.WorldBuilder {
                 m_additiveAreas = new List<InstanceArea>();
                 m_subtractiveAreas = new List<InstanceArea>();
                 foreach (InstanceArea area in areas) {
-                    if (area.m_operation == Operation.Additive) {
-                        m_additiveAreas.Add(area);
-                    } else {
-                        m_subtractiveAreas.Add(area);
+                    if (area.isActiveAndEnabled) {
+                        if (area.m_operation == Operation.Additive) {
+                            m_additiveAreas.Add(area);
+                        } else {
+                            m_subtractiveAreas.Add(area);
+                        }
                     }
                 }
 
