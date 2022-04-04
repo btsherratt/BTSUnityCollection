@@ -3,8 +3,6 @@ using UnityEngine;
 
 namespace SKFX.WorldBuilder {
     public abstract class InstanceArea : MonoBehaviour {
-        const int kInstancesPerUnit = 10;
-
         public delegate void ChangeEvent(InstanceArea instanceArea);
         public static event ChangeEvent ms_changeEvent;
 
@@ -24,7 +22,7 @@ namespace SKFX.WorldBuilder {
 
             public long DetailsCount => m_instanceCount;
 
-            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, int seed) {
+            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, int seed, int instancesPerUnit) {
                 m_additiveAreas = new List<InstanceArea>();
                 m_subtractiveAreas = new List<InstanceArea>();
                 foreach (InstanceArea area in areas) {
@@ -42,7 +40,7 @@ namespace SKFX.WorldBuilder {
                     m_totalArea += instanceArea.Area;
                 }
 
-                m_instanceCount = Mathf.FloorToInt(Mathf.Lerp(0, kInstancesPerUnit * Mathf.Sqrt(m_totalArea), density));
+                m_instanceCount = Mathf.FloorToInt(Mathf.Lerp(0, instancesPerUnit * Mathf.Sqrt(m_totalArea), density));
                 m_seed = seed;
             }
 
@@ -106,6 +104,9 @@ namespace SKFX.WorldBuilder {
                     if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
                         snappedDetails.position = hit.point;
                         snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
+
+                        // We want snapped details so yield nothing if nothing is there...
+                        yield return snappedDetails;
                     }
 
                     /*if (Physics.Raycast(details.position + normal * 3000, -normal, out hit, float.MaxValue, snapLayerMask)) {
@@ -115,8 +116,6 @@ namespace SKFX.WorldBuilder {
                         snappedDetails.position = hit.point;
                         snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.down, -hit.normal), -hit.normal);
                     }*/
-
-                    yield return snappedDetails;
                 }
             }
         }
@@ -128,8 +127,8 @@ namespace SKFX.WorldBuilder {
 
 
 
-        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed) {
-            return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed);
+        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed, int instancesPerUnit) {
+            return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed, instancesPerUnit);
         }
 
         public enum Operation {

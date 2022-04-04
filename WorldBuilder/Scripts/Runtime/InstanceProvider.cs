@@ -19,6 +19,9 @@ namespace SKFX.WorldBuilder {
             public bool m_randomZRotation = false;
 
             public AnimationCurve m_scaleCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+            [Header("Advanced Settings")]
+            public int m_instancesPerUnit = 10;
         }
 
         public struct InstanceDetails : ITransformDetailsProviding {
@@ -84,7 +87,7 @@ namespace SKFX.WorldBuilder {
 
             int seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {
-                ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed);
+                ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed, configuration.m_instancesPerUnit);
                 InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider, 1 << m_snapLayer);
                 yield return details;
                 ++seed;
