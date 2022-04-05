@@ -88,7 +88,7 @@ public class Spline : MonoBehaviour {
                 float currentLength = 0.0f;
                 Vector3 previousPosition = points[0].position;
                 for (int i = 1; i < numPoints; ++i) {
-                    float t = i / (float)numPoints;
+                    float t = i / (float)(numPoints - 1);
                     Vector3 position = Lerp(t);
                     float distance = Vector3.Distance(previousPosition, position);
                     currentLength += distance;
@@ -200,7 +200,7 @@ public class Spline : MonoBehaviour {
                 }
             }
 
-            float pt = relativeToSegmentT / segment.points[pointIdx].distance;
+            float pt = Mathf.InverseLerp(segment.points[pointIdx].distance, segment.points[pointIdx + 1].distance, relativeToSegmentT);
             forward = Vector3.Lerp(segment.points[pointIdx].forward, segment.points[pointIdx + 1].forward, pt);
             return Vector3.Lerp(segment.points[pointIdx].position, segment.points[pointIdx + 1].position, pt);
 
@@ -209,9 +209,9 @@ public class Spline : MonoBehaviour {
         }
     }
 
-    public float ClosestPositionOnSpline(Vector3 point, Units units) {
-        CacheSpline();
-        return 0.0f;
+    //public float ClosestPositionOnSpline(Vector3 point, Units units) {
+    //    CacheSpline();
+    //    return 0.0f;
         /*if (cachedSpline == null)
         {
             cachedSpline = GenerateSpline();
@@ -234,7 +234,7 @@ public class Spline : MonoBehaviour {
         }
 
         return cachedSpline[minPositionIdx].worldDistance;*/
-    }
+    //}
 
     public bool TestDistanceToSpline(Vector3 position, float distance) {
         CacheSpline();

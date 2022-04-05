@@ -127,7 +127,7 @@ namespace SKFX.WorldBuilder {
             Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefabLOD = new Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>>();
 
 
-            foreach (InstanceProvider instanceProvider in InstanceProvider.All(true)) {
+            foreach (InstanceProvider instanceProvider in InstanceProvider.All()) {
                 foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
                     LODGroup prefabLODGroup = details.prefabConfiguration.m_prefab.GetComponent<LODGroup>();
                     if (prefabLODGroup != null) {

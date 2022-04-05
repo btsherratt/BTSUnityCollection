@@ -83,7 +83,7 @@ namespace SKFX.WorldBuilder {
         public static event ChangeEvent ms_changeEvent;
 
         public IEnumerable<InstanceDetails> GenerateInstanceDetails() {
-            InstanceArea[] areas = GetComponents<InstanceArea>();
+            InstanceArea[] areas = GetComponentsInChildren<InstanceArea>();
 
             int seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {

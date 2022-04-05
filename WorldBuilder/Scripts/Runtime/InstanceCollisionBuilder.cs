@@ -1,0 +1,116 @@
+using System.Collections.Generic;
+using Unity.Collections;
+using UnityEngine;
+
+namespace SKFX.WorldBuilder {
+    public class InstanceCollisionBuilder : MonoBehaviour {
+        void Start() {
+            Setup();
+        }
+
+        void Setup() {
+            GenerateCollisionMesh();
+        }
+
+        void GenerateCollisionMesh() {
+            Dictionary<GameObject, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<InstanceProvider.InstanceDetails>>();
+
+            foreach (InstanceProvider instanceProvider in InstanceProvider.All()) {
+                foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
+                    Collider prefabCollider = details.prefabConfiguration.m_prefab.GetComponentInChildren<Collider>();
+                    if (prefabCollider != null) {
+                        List<InstanceProvider.InstanceDetails> instanceDetails;
+                        if (instanceDetailsByPrefab.TryGetValue(details.prefabConfiguration.m_prefab, out instanceDetails) == false) {
+                            instanceDetails = new List<InstanceProvider.InstanceDetails>();
+                            instanceDetailsByPrefab[details.prefabConfiguration.m_prefab] = instanceDetails;
+                        }
+                        instanceDetails.Add(details);
+                    }
+                }
+            }
+
+            List<CombineInstance> combineInstances = new List<CombineInstance>();
+
+            GameObject host = new GameObject("__COLLISION_HOST");
+
+            foreach (var pair in instanceDetailsByPrefab) {
+                GameObject prefab = pair.Key;
+                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+
+                Collider[] prefabColliders = prefab.GetComponentsInChildren<Collider>();
+
+                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                    foreach (TransformDetails transformDetails in details.GenerateSnappedDetails()) {
+                        foreach (Collider collider in prefabColliders) {
+                            System.Type colliderType = collider.GetType();
+
+                            if (colliderType == typeof(MeshCollider)) {
+                                Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
+
+                                MeshCollider cloneCollider = collider as MeshCollider;
+
+                                CombineInstance combineInstance = new CombineInstance();
+                                combineInstance.mesh = cloneCollider.sharedMesh;
+                                combineInstance.transform = matrix;
+                                combineInstances.Add(combineInstance);
+                            } else {
+                                GameObject newColliderHost = new GameObject("Host");
+                                newColliderHost.transform.SetParent(host.transform);
+                                newColliderHost.transform.position = transformDetails.position;
+                                newColliderHost.transform.rotation = transformDetails.rotation;
+                                newColliderHost.transform.localScale = Vector3.one * transformDetails.uniformScale; // FIXME, we need to add the matrix for the child....
+
+                                if (colliderType == typeof(BoxCollider)) {
+                                    BoxCollider cloneCollider = collider as BoxCollider;
+                                    BoxCollider newCollider = newColliderHost.AddComponent<BoxCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.size = cloneCollider.size;
+                                } else if (colliderType == typeof(SphereCollider)) {
+                                    SphereCollider cloneCollider = collider as SphereCollider;
+                                    SphereCollider newCollider = newColliderHost.AddComponent<SphereCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.radius = cloneCollider.radius;
+                                } else if (colliderType == typeof(CapsuleCollider)) {
+                                    CapsuleCollider cloneCollider = collider as CapsuleCollider;
+                                    CapsuleCollider newCollider = newColliderHost.AddComponent<CapsuleCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.direction = cloneCollider.direction;
+                                    newCollider.height = cloneCollider.height;
+                                    newCollider.radius = cloneCollider.radius;
+                                }
+                            }
+                        }
+
+
+
+                        /*Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
+
+                        foreach (Renderer renderer in primaryLOD.renderers) {
+                            MeshFilter mf = renderer.GetComponent<MeshFilter>();
+                            if (mf != null) {
+                                for (int i = 0; i < mf.sharedMesh.subMeshCount; ++i) {
+                                    CombineInstance combineInstance = new CombineInstance();
+                                    combineInstance.mesh = mf.sharedMesh;
+                                    combineInstance.subMeshIndex = i;
+                                    combineInstance.transform = matrix;
+                                    combineInstances.Add(combineInstance);
+                                    Debug.Log("HAI");
+                                }
+                            }
+                        }*/
+                    }
+                }
+            }
+
+            if (combineInstances.Count > 0) {
+                Mesh collisionMesh = new Mesh();
+                collisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+                collisionMesh.CombineMeshes(combineInstances.ToArray(), true, true);
+
+                MeshCollider collider = host.AddComponent<MeshCollider>();
+                collider.sharedMesh = collisionMesh;
+            }
+
+        }
+    }
+}
