@@ -48,6 +48,9 @@ namespace SKFX.WorldBuilder {
 
         public ComputeShader m_computeShader;
 
+        [Layer]
+        public int m_renderLayer;
+
         CommandBuffer m_commandBuffer;
 
         List<DrawData> m_drawData;
@@ -83,7 +86,7 @@ namespace SKFX.WorldBuilder {
         }
 
         void TryDraw(Camera camera) {
-            if (camera != null && (camera.cameraType == CameraType.Game || camera.cameraType == CameraType.SceneView)) {
+            if (camera != null && ((camera.cameraType == CameraType.Game && (camera.cullingMask & (1 << m_renderLayer)) > 0) || camera.cameraType == CameraType.SceneView)) {
                 Camera detailsCamera = (Application.isPlaying && camera.cameraType == CameraType.SceneView) ? Camera.main : camera;
 
                 Vector4 cameraDetails1 = detailsCamera.transform.position;
@@ -335,7 +338,7 @@ namespace SKFX.WorldBuilder {
 
                     m_commandBuffer.SetComputeMatrixParam(m_computeShader, "_MeshOffsetMatrix", drawPair.matrix);
 
-                    m_commandBuffer.SetComputeBufferCounterValue(drawData.matrixBuffer, 0);
+                    m_commandBuffer.SetBufferCounterValue(drawData.matrixBuffer, 0);
                     m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
 
                     m_commandBuffer.SetGlobalMatrix("_MeshOffsetMatrix", drawPair.matrix);

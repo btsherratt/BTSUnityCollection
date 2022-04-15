@@ -66,8 +66,15 @@ namespace SKFX.WorldBuilder {
             return point;
         }
 
-        protected override bool TestPointInArea(Vector3 point) {
+
+        public override bool TestPointInArea(Vector3 point) {
+            point = m_spline.transform.InverseTransformPoint(point);
             return m_spline.TestDistanceToSpline(point, m_width);
+        }
+
+        public override bool TestPointInAreaXZ(Vector3 point) {
+            point = m_spline.transform.InverseTransformPoint(point);
+            return m_spline.TestDistanceToSpline(point, m_width, new Vector3(1, 0, 1));
         }
     }
 }

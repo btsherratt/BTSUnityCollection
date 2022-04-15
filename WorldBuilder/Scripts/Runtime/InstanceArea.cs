@@ -67,7 +67,7 @@ namespace SKFX.WorldBuilder {
 
                         badPosition = false;
                         foreach (InstanceArea instanceArea in m_subtractiveAreas) {
-                            if (instanceArea.TestPointInArea(point)) {
+                            if (instanceArea.TestPointInAreaXZ(point)) {
                                 badPosition = true;
                                 break;
                             }
@@ -150,7 +150,10 @@ namespace SKFX.WorldBuilder {
 
         protected abstract float Area { get; }
         protected abstract Vector3 RandomPointInArea();
-        protected abstract bool TestPointInArea(Vector3 point);
+        //        protected abstract bool TestPointInArea(Vector3 point);
+
+        public abstract bool TestPointInArea(Vector3 point);
+        public abstract bool TestPointInAreaXZ(Vector3 point);
 
         /*void OnDrawGizmos() {
             foreach (Triangle triangle in GetTriangles()) {

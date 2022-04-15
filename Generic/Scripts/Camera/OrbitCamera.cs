@@ -23,7 +23,7 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
 
     Vector3 ICameraPositionProviding.CameraLookTarget => m_lookTarget.position;
 
-    void Start() {
+    private void OnEnable() {
         if (m_followTarget == null) {
             m_followTarget = GameObject.FindGameObjectWithTag("Player").transform;
         }

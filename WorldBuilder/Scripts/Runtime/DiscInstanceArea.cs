@@ -15,8 +15,16 @@ namespace SKFX.WorldBuilder {
             return position;
         }
 
-        protected override bool TestPointInArea(Vector3 point) {
-            Vector3 delta = point - transform.position;
+        public override bool TestPointInArea(Vector3 point) {
+            return TestPointInArea(point, transform.position);
+        }
+
+        public override bool TestPointInAreaXZ(Vector3 point) {
+            return TestPointInArea(point.XZ(), transform.position.XZ());
+        }
+
+        bool TestPointInArea(Vector3 point, Vector3 position) {
+            Vector3 delta = point - position;
             bool test = delta.sqrMagnitude <= m_radius * m_radius;
             return test;
         }

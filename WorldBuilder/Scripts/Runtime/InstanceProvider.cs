@@ -85,6 +85,15 @@ namespace SKFX.WorldBuilder {
         public IEnumerable<InstanceDetails> GenerateInstanceDetails() {
             InstanceArea[] areas = GetComponentsInChildren<InstanceArea>();
 
+            List<InstanceArea> filteredAreas = new List<InstanceArea>();
+            foreach (InstanceArea area in areas) {
+                bool use = true;
+                if (area.m_operation == InstanceArea.Operation.Subtractive || (area.m_operation == InstanceArea.Operation.Additive && area.GetComponentInParent<InstanceProvider>() == this)) {
+                    filteredAreas.Add(area);
+                }
+            }
+            areas = filteredAreas.ToArray();
+
             int seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {
                 ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed, configuration.m_instancesPerUnit);

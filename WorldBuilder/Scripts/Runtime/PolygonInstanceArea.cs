@@ -67,12 +67,35 @@ namespace SKFX.WorldBuilder {
             return point;
         }
 
-        protected override bool TestPointInArea(Vector3 point) {
-            if (m_cachedBounds.Contains(point)) {
-                return true; // FIXME
-            } else {
-                return false;
+        public override bool TestPointInArea(Vector3 point) {
+            RegenerateTriangles();
+
+            if (m_cachedBounds.SqrDistance(point) <= float.Epsilon) {
+                //Vector3 localPoint = transform.InverseTransformPoint(point);
+                foreach (Triangle t in m_cachedTriangles) {
+                    if (t.ContainsPoint(point)) {
+                        return true;
+                    }
+                }
             }
+            
+            return false;
+        }
+
+        public override bool TestPointInAreaXZ(Vector3 point) {
+            RegenerateTriangles();
+
+            point.y = m_cachedBounds.center.y;
+            if (m_cachedBounds.SqrDistance(point) <= float.Epsilon) {
+                //Vector3 localPoint = transform.InverseTransformPoint(point);
+                foreach (Triangle t in m_cachedTriangles) {
+                    if (t.ContainsPoint(point)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         protected struct Triangle {
@@ -119,16 +142,26 @@ namespace SKFX.WorldBuilder {
                 return position;
             }
 
+            // https://blackpawn.com/texts/pointinpoly/
             public bool ContainsPoint(Vector3 point) {
+                Vector3 deltaPoint = point - p2;
+
                 Vector2 a = deltaA.XZ();
                 Vector2 b = deltaB.XZ();
-                Vector2 c = (p1 - p0).XZ();
-                Vector2 test1 = (point - p2).XZ();
-                Vector2 test2 = (point - p0).XZ();
-                float da = Vector2.Dot(test1, a);
-                float db = Vector2.Dot(test1, b);
-                float dc = Vector2.Dot(test2, c);
-                return da >= 0 && db >= 0 && dc >= 0 && da <= a.sqrMagnitude && db <= b.sqrMagnitude && dc <= c.sqrMagnitude; // FIXME, slow
+                Vector2 c = deltaPoint.XZ();
+
+                float dot00 = Vector2.Dot(a, a);
+                float dot01 = Vector2.Dot(a, b);
+                float dot02 = Vector2.Dot(a, c);
+
+                float dot11 = Vector2.Dot(b, b);
+                float dot12 = Vector2.Dot(b, c);
+
+                float invDenom = 1.0f / (dot00 * dot11 - dot01 * dot01);
+                float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+                float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+                return (u >= 0) && (v >= 0) && (u + v < 1);
             }
         }
 

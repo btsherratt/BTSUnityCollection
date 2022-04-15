@@ -212,40 +212,52 @@ public class Spline : MonoBehaviour {
     //public float ClosestPositionOnSpline(Vector3 point, Units units) {
     //    CacheSpline();
     //    return 0.0f;
-        /*if (cachedSpline == null)
+    /*if (cachedSpline == null)
+    {
+        cachedSpline = GenerateSpline();
+    }
+
+
+
+
+    int minPositionIdx = 0;
+
+    float minDistance = Vector3.Distance(point, cachedSpline[0].position);
+    for (int i = 1; i < cachedSpline.Length; ++i)
+    {
+        float distance = Vector3.Distance(point, cachedSpline[i].position);
+        if (distance < minDistance)
         {
-            cachedSpline = GenerateSpline();
+            minDistance = distance;
+            minPositionIdx = i;
         }
+    }
 
-
-
-
-        int minPositionIdx = 0;
-
-        float minDistance = Vector3.Distance(point, cachedSpline[0].position);
-        for (int i = 1; i < cachedSpline.Length; ++i)
-        {
-            float distance = Vector3.Distance(point, cachedSpline[i].position);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                minPositionIdx = i;
-            }
-        }
-
-        return cachedSpline[minPositionIdx].worldDistance;*/
+    return cachedSpline[minPositionIdx].worldDistance;*/
     //}
 
+
     public bool TestDistanceToSpline(Vector3 position, float distance) {
+        return TestDistanceToSpline(position, distance, Vector3.one);
+    }
+
+    public bool TestDistanceToSpline(Vector3 position, float distance, Vector3 componentContribution) {
         CacheSpline();
 
+        Vector3 testPosition = Vector3.Scale(position, componentContribution);
         foreach (SplineSegment splineSegment in m_cachedSpline) {
-            Bounds bounds = splineSegment.bounds;
-            bounds.Expand(distance);
-            if (bounds.Contains(position)) {
-                foreach (SplinePoint point in splineSegment.points) {
-                    Vector3 delta = point.position - position;
-                    if (delta.sqrMagnitude <= distance * distance) {
+            Vector3 boundsTestPosition = testPosition;// testPosition.XZ(); // FIXME
+            boundsTestPosition.x = Mathf.Lerp(splineSegment.bounds.center.x, testPosition.x, componentContribution.x);
+            boundsTestPosition.y = Mathf.Lerp(splineSegment.bounds.center.y, testPosition.y, componentContribution.y);
+            boundsTestPosition.z = Mathf.Lerp(splineSegment.bounds.center.z, testPosition.z, componentContribution.z);
+
+            if (splineSegment.bounds.SqrDistance(boundsTestPosition) <= (distance * distance)) {
+                for (int i = 0; i < splineSegment.points.Length - 1; ++i) {
+                    SplinePoint point1 = splineSegment.points[i];
+                    SplinePoint point2 = splineSegment.points[i + 1];
+                    Vector3 testPoint1 = Vector3.Scale(point1.position, componentContribution);
+                    Vector3 testPoint2 = Vector3.Scale(point2.position, componentContribution);
+                    if (MathFFS.DistanceLineSegmentSq(testPoint1, testPoint2, testPosition) <= distance * distance) {
                         return true;
                     }
                 }
