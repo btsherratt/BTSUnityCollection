@@ -87,7 +87,6 @@ namespace SKFX.WorldBuilder {
 
             List<InstanceArea> filteredAreas = new List<InstanceArea>();
             foreach (InstanceArea area in areas) {
-                bool use = true;
                 if (area.m_operation == InstanceArea.Operation.Subtractive || (area.m_operation == InstanceArea.Operation.Additive && area.GetComponentInParent<InstanceProvider>() == this)) {
                     filteredAreas.Add(area);
                 }

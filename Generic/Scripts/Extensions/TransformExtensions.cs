@@ -9,4 +9,10 @@ public static class TransformExtensions {
         transform.position = position;
         transform.rotation = rotation;
     }
+
+    public static void MatchPositionXZ(this Transform transform, Transform matchTransform) {
+        float y = transform.position.y;
+        Vector3 position = matchTransform.position;
+        transform.position = new Vector3(position.x, y, position.z);
+    }
 }

@@ -37,6 +37,14 @@ public class TrackedMonoBehaviour<T> : MonoBehaviour where T : TrackedMonoBehavi
             instance = null;
         }
 
+#if UNITY_EDITOR
+        // Helper to get rid of prefabs that have poisoned the pool
+        if (instance != null && instance.gameObject.scene.rootCount == 0) {
+            instance = null;
+            ms_instances[idx] = null;
+        }
+#endif
+
         return instance;
     }
 
@@ -65,6 +73,10 @@ public class TrackedMonoBehaviour<T> : MonoBehaviour where T : TrackedMonoBehavi
         }
 
         return populatedCount;
+    }
+
+    public static T Nearest(Vector3 position, bool filterActive = false, ComponentExtensions.FilterDelegate<T> filter = null) {
+        return ComponentExtensions.Nearest(All(filterActive), position, filter);
     }
 
     public TrackedMonoBehaviour() {

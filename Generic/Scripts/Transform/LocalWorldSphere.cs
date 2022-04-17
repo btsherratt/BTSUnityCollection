@@ -1,21 +1,55 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Pool;
 
 public class LocalWorldSphere : MonoBehaviour {
-    RaycastHit[] ms_raycastHits;
-
     public float m_radius = 100.0f;
 
-    [Layer]
-    public int m_groundLayer;
+    public GameObject m_prefab;
+    public int m_numPooledObjects;
 
-    public Transform m_monitorParentTransform;
+    ObjectPool<GameObject> m_prefabPool;
+    GameObject[] m_activeInstances;
 
-    public int m_transformsPerPool = 10;
+    void Start() {
+        m_prefabPool = new ObjectPool<GameObject>(CreatePrefab, defaultCapacity: m_numPooledObjects, maxSize: m_numPooledObjects);
+        m_activeInstances = new GameObject[m_numPooledObjects];
 
-    Transform[] m_monitoredTransforms;
-    int m_currentPoolOffset;
+        for (int i = 0; i < m_numPooledObjects; ++i) {
+            m_activeInstances[i] = SpawnInstance();
+        }
+    }
+
+    GameObject CreatePrefab() {
+        return Instantiate(m_prefab);
+    }
+
+    void Update() {
+        for (int i = 0; i < m_numPooledObjects; ++i) {
+            if (m_activeInstances[i] != null && Vector3.Distance(m_activeInstances[i].transform.position, transform.position) > m_radius * 2.0f) {
+                m_prefabPool.Release(m_activeInstances[i]);
+                m_activeInstances[i] = null;
+            }
+        }
+
+        for (int i = 0; i < m_numPooledObjects; ++i) {
+            if (m_activeInstances[i] == null && m_prefabPool.CountInactive > 0) {
+                m_activeInstances[i] = SpawnInstance();
+            }
+        }
+    }
+
+    GameObject SpawnInstance() {
+        GameObject instance = m_prefabPool.Get();
+        Vector2 direction = Random.insideUnitCircle.normalized;
+        Vector2 position = direction * m_radius * (Random.value + 1.0f);
+        instance.transform.position = transform.TransformPoint(new Vector3(position.x, 0, position.y));
+        return instance;
+    }
+
+
+    /*int m_currentPoolOffset;
     int m_poolCount;
 
     void Start() {
@@ -46,5 +80,5 @@ public class LocalWorldSphere : MonoBehaviour {
             }
         }
         ++m_currentPoolOffset;
-    }
+    }*/
 }
