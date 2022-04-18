@@ -7,12 +7,6 @@ namespace SKFX.WorldBuilder {
         public static event ChangeEvent ms_changeEvent;
 
 
-
-
-
-
-
-
         class InstanceAreaTransformDetailsProvider : ITransformDetailsProviding {
             List<InstanceArea> m_additiveAreas;
             List<InstanceArea> m_subtractiveAreas;
@@ -44,7 +38,7 @@ namespace SKFX.WorldBuilder {
                 m_seed = seed;
             }
 
-            public IEnumerable<TransformDetails> GenerateDetails() {
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
                 Random.State oldState = Random.state;
                 Random.InitState(m_seed);
 
@@ -74,58 +68,31 @@ namespace SKFX.WorldBuilder {
                         }
                     } while (badPosition);
 
-                    TransformDetails details = new TransformDetails();
+                    ref TransformDetails details = ref transformDetailsOut[startIndex + i];
                     details.position = point;
                     details.rotation = Quaternion.identity;// LookRotation(selectedTriangle.forward, selectedTriangle.normal);
                     details.uniformScale = 1.0f;
-
-                    //                  Random.State currentState = Random.state;
-                    //                  Random.state = oldState;
-
-                    yield return details;
-
-                    //                 oldState = Random.state;
-                    //                  Random.state = currentState;  fixme, is this safe really?? (no)
                 }
 
                 Random.state = oldState;
-            }
 
-            public IEnumerable<TransformDetails> GenerateSnappedDetails(int snapLayerMask) {
-                foreach (TransformDetails details in GenerateDetails()) {
-                    TransformDetails snappedDetails = new TransformDetails();
-                    snappedDetails.position = details.position;
-                    snappedDetails.rotation = details.rotation;
-                    snappedDetails.uniformScale = details.uniformScale;
+                if (snapLayerMask > 0) {
+                    for (int i = 0; i < m_instanceCount; ++i) {
+                        ref TransformDetails details = ref transformDetailsOut[startIndex + i];
 
-                    Vector3 normal = details.rotation * Vector3.up;
-                    RaycastHit hit;
+                        Vector3 normal = details.rotation * Vector3.up;
+                        RaycastHit hit;
 
-                    if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
-                        snappedDetails.position = hit.point;
-                        snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
-
-                        // We want snapped details so yield nothing if nothing is there...
-                        yield return snappedDetails;
+                        if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
+                            details.position = hit.point;
+                            details.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
+                        }
                     }
-
-                    /*if (Physics.Raycast(details.position + normal * 3000, -normal, out hit, float.MaxValue, snapLayerMask)) {
-                        snappedDetails.position = hit.point;
-                        snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.down, hit.normal), hit.normal);
-                    } else if (Physics.Raycast(details.position - normal * 3000, normal, out hit, float.MaxValue, snapLayerMask)) {
-                        snappedDetails.position = hit.point;
-                        snappedDetails.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.down, -hit.normal), -hit.normal);
-                    }*/
                 }
+
+                return startIndex + m_instanceCount;
             }
         }
-
-
-
-
-
-
-
 
         public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed, int instancesPerUnit) {
             return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed, instancesPerUnit);

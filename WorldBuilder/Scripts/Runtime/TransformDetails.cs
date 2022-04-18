@@ -4,6 +4,7 @@ using UnityEngine;
 namespace SKFX.WorldBuilder {
     [Serializable]
     public struct TransformDetails {
+        public const int Size = 2 * 4 * sizeof(float);
         public Vector3 position;
         public float uniformScale;
         public Quaternion rotation;

@@ -3,7 +3,7 @@
 struct Data {
     float4 posScale;
     float4 rotation;
-    float4 data;
+    //float4 data;
 };
 
 //float3 _CameraPos;

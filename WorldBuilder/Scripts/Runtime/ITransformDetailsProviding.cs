@@ -4,7 +4,9 @@ namespace SKFX.WorldBuilder {
     public interface ITransformDetailsProviding {
         long DetailsCount { get; }
 
-        IEnumerable<TransformDetails> GenerateDetails();
-        IEnumerable<TransformDetails> GenerateSnappedDetails(int snapLayerMask);
+        long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0);
+
+        //IEnumerable<TransformDetails> GenerateDetails();
+        //IEnumerable<TransformDetails> GenerateSnappedDetails(int snapLayerMask);
     }
 }

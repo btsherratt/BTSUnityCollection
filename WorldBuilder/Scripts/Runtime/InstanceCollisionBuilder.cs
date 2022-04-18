@@ -40,8 +40,8 @@ namespace SKFX.WorldBuilder {
                 Collider[] prefabColliders = prefab.GetComponentsInChildren<Collider>();
 
                 foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
-                    foreach (TransformDetails transformDetails in details.GenerateSnappedDetails()) {
-                        foreach (Collider collider in prefabColliders) {
+                    //foreach (TransformDetails transformDetails in /*details.GenerateSnappedDetails()*/details.GenerateDetails()) {
+                    /*    foreach (Collider collider in prefabColliders) {
                             System.Type colliderType = collider.GetType();
 
                             if (colliderType == typeof(MeshCollider)) {
@@ -98,7 +98,7 @@ namespace SKFX.WorldBuilder {
                                 }
                             }
                         }*/
-                    }
+                    //}
                 }
             }
 

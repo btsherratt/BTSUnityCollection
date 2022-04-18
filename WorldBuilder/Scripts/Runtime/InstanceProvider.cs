@@ -37,38 +37,23 @@ namespace SKFX.WorldBuilder {
 
             public long DetailsCount => transformDetailsProvider.DetailsCount;
 
-            public IEnumerable<TransformDetails> GenerateDetails() {
-                foreach (TransformDetails td in transformDetailsProvider.GenerateDetails()) {
-                    TransformDetails transformDetails = new TransformDetails();
-                    transformDetails.position = td.position;
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex) {
+                return GenerateDetails(transformDetailsOut, startIndex, snapLayerMask);
+            }
 
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
+                long finalIndex = transformDetailsProvider.GenerateDetails(transformDetailsOut, startIndex, snapLayerMask);
+
+                for (long i = startIndex; i < finalIndex; ++i) {
+                    ref TransformDetails transformDetails = ref transformDetailsOut[i];
                     float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
                     float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
                     float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    transformDetails.rotation = td.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
-
+                    transformDetails.rotation = transformDetails.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
                     transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
-                    yield return transformDetails;
                 }
-            }
 
-            public IEnumerable<TransformDetails> GenerateSnappedDetails() {
-                return GenerateSnappedDetails(snapLayerMask);
-            }
-
-            public IEnumerable<TransformDetails> GenerateSnappedDetails(int snapLayerMask) {
-                foreach (TransformDetails td in transformDetailsProvider.GenerateSnappedDetails(snapLayerMask)) {
-                    TransformDetails transformDetails = new TransformDetails();
-                    transformDetails.position = td.position;
-
-                    float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    transformDetails.rotation = td.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
-
-                    transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
-                    yield return transformDetails;
-                }
+                return finalIndex;
             }
         }
 
