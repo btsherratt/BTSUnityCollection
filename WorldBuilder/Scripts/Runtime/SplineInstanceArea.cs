@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -6,24 +7,8 @@ using UnityEngine;
 namespace SKFX.WorldBuilder {
     [ExecuteInEditMode]
     public class SplineInstanceArea : InstanceArea {
-        struct JobContainer : IJobContainer {
-            TransformDetailsGeneratorJob job;
-
-            public JobContainer(TransformDetailsGeneratorJob job) {
-                this.job = job;
-            }
-
-            public void Dispose() {
-                job.spline.Dispose();
-            }
-
-            public JobHandle Schedule() {
-                return job.Schedule();
-            }
-        }
-
         [BurstCompile(CompileSynchronously = true)]
-        struct TransformDetailsGeneratorJob : IJob {
+        struct TransformDetailsGeneratorJob : IJob, IDisposable {
             [ReadOnly]
             public Spline.SplineImpl spline;
 
@@ -56,6 +41,40 @@ namespace SKFX.WorldBuilder {
                     details.position = point;
                     Output[i] = details;
                 }
+            }
+
+            public void Dispose() {
+                spline.Dispose();
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true)]
+        struct TransformDetailsFilterJob : IJob, IDisposable {
+            [ReadOnly]
+            public Spline.SplineImpl spline;
+
+            [ReadOnly]
+            public float width;
+
+            [ReadOnly]
+            public Matrix4x4 matrix;
+
+            [ReadOnly]
+            public NativeArray<TransformDetails> Input;
+
+            [WriteOnly]
+            public NativeArray<bool> Output;
+
+            public void Execute() {
+                for (int i = 0; i < Output.Length; ++i) {
+                    Vector3 point = matrix * Input[i].position;
+                    bool test = spline.TestDistanceToSpline(point, width, new Vector3(1, 0, 1));
+                    Output[i] = test;
+                }
+            }
+
+            public void Dispose() {
+                spline.Dispose();
             }
         }
 
@@ -113,8 +132,7 @@ namespace SKFX.WorldBuilder {
 
 
 
-
-        protected override IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
             job.randomSeed = randomSeed;
             job.spline = m_spline.GetSplineImpl(Allocator.TempJob);
@@ -122,8 +140,32 @@ namespace SKFX.WorldBuilder {
             job.matrix = m_spline.transform.localToWorldMatrix;
             job.Output = details;
 
-            return new JobContainer(job);
+            return new JobContainer<TransformDetailsGeneratorJob>(job);
         }
+
+
+
+
+
+
+
+
+
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+            TransformDetailsFilterJob job = new TransformDetailsFilterJob();
+            job.spline = m_spline.GetSplineImpl(Allocator.TempJob);
+            job.width = m_width;
+            job.matrix = transform.localToWorldMatrix;
+            job.Input = details;
+            job.Output = overlap;
+
+            return new JobContainer<TransformDetailsFilterJob>(job);
+        }
+
+
+
+
+
 
 
 
@@ -132,11 +174,11 @@ namespace SKFX.WorldBuilder {
 
         protected override Vector3 RandomPointInArea() {
             Vector3 forward;
-            Vector3 point = m_spline.Lerp(out forward, Random.Range(0.0f, m_spline.Length), Spline.Units.World);
+            Vector3 point = m_spline.Lerp(out forward, UnityEngine.Random.Range(0.0f, m_spline.Length), Spline.Units.World);
             //point = transform.TransformPoint(point);
             // FIXME, offset
             point = m_spline.transform.TransformPoint(point);
-            point += Vector3.Cross(forward, Vector3.up) * Random.Range(-m_width / 2.0f, m_width / 2.0f);
+            point += Vector3.Cross(forward, Vector3.up) * UnityEngine.Random.Range(-m_width / 2.0f, m_width / 2.0f);
             return point;
         }
 

@@ -337,7 +337,7 @@ public class Spline : MonoBehaviour {
 
     private void OnValidate() {
         if (m_cachedSpline != null) {
-            m_cachedSpline.Value.Dispose();
+            m_cachedSpline.Dispose();
             m_cachedSpline = null;
         }
 

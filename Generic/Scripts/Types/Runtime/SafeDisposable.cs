@@ -5,7 +5,7 @@ using UnityEditor;
 #endif
 
 [System.Serializable]
-public struct SafeDisposable<T> : System.IDisposable where T : System.IDisposable {
+public class SafeDisposable<T> : System.IDisposable where T : System.IDisposable {
     public static implicit operator T(SafeDisposable<T> r) {
         return r.Value;
     }
@@ -17,18 +17,22 @@ public struct SafeDisposable<T> : System.IDisposable where T : System.IDisposabl
     [SerializeField]
     T m_value;
 
+    bool m_disposed;
+
     public T Value {
         get => m_value;
         set {
             if (System.Collections.Generic.EqualityComparer<T>.Default.Equals(m_value, value) == false) {
-                m_value.Dispose();
+                Dispose();
                 m_value = value;
+                m_disposed = false;
             }
         }
     }
 
     public SafeDisposable(T value) {
         m_value = value;
+        m_disposed = false;
 
 #if UNITY_EDITOR
         EditorApplication.playModeStateChanged += DisposeOnStateChange;
@@ -37,7 +41,7 @@ public struct SafeDisposable<T> : System.IDisposable where T : System.IDisposabl
 
 #if UNITY_EDITOR
     private void DisposeOnStateChange(PlayModeStateChange state) {
-        switch (state) {
+        switch (state) { 
             case PlayModeStateChange.ExitingEditMode:
             case PlayModeStateChange.ExitingPlayMode:
                 Dispose();
@@ -51,7 +55,9 @@ public struct SafeDisposable<T> : System.IDisposable where T : System.IDisposabl
 #endif
 
     public void Dispose() {
-        m_value.Dispose();
-        m_value = default(T);
+        if (m_disposed == false) {
+            m_disposed = true;
+            m_value.Dispose();
+        }
     }
 }

@@ -23,10 +23,10 @@ namespace SKFX.WorldBuilder {
         struct DrawData {
             public DrawPair[] drawPairs;
 
-            public SafeDisposable<ComputeBuffer> unculledDataBuffer;
+            public ComputeBuffer unculledDataBuffer;
 
-            public SafeDisposable<ComputeBuffer> indirectArguments;
-            public SafeDisposable<ComputeBuffer> matrixBuffer;
+            public ComputeBuffer indirectArguments;
+            public ComputeBuffer matrixBuffer;
         }
 
         /*[StructLayout(LayoutKind.Explicit, Pack = 1, Size = InstanceDetails.Size)]
@@ -55,6 +55,10 @@ namespace SKFX.WorldBuilder {
 
         List<DrawData> m_drawData;
         HashSet<Camera> m_cameras;
+
+        private void OnApplicationQuit() {
+            Cleanup();
+        }
 
         void OnDestroy() {
             Cleanup();
@@ -140,6 +144,7 @@ namespace SKFX.WorldBuilder {
                 }
             }
 
+            long totalInstances = 0;
             foreach (var pair in instanceDetailsByPrefabLOD) {
                 LODGroup prefabLODGroup = pair.Key;
                 List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
@@ -188,7 +193,7 @@ namespace SKFX.WorldBuilder {
 
                 if (detailsCount > 0) {
                     int roundedElements = Mathf.CeilToInt((float)detailsCount / (float)KERNEL_SIZE) * KERNEL_SIZE;
-                    drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, TransformDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+                    //drawData.unculledDataBuffer = new ComputeBuffer(roundedElements, TransformDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
 
                     TransformDetails[] allInstanceDetails = new TransformDetails[roundedElements];
                     int count = 0;
@@ -206,7 +211,15 @@ namespace SKFX.WorldBuilder {
                             allInstanceDetails[count++] = d;
                         }*/
                     }
-                    drawData.unculledDataBuffer.Value.SetData(allInstanceDetails);
+
+                    totalInstances += startIdx;
+
+                    if (startIdx > int.MaxValue) {
+                        Debug.LogError("Too many values!!!");
+                    }
+
+                    drawData.unculledDataBuffer = new ComputeBuffer((int)startIdx, TransformDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+                    drawData.unculledDataBuffer.SetData(allInstanceDetails, 0, 0, drawData.unculledDataBuffer.count);
 
                     uint[] args = new uint[drawPairs.Count * 5];
                     for (int i = 0; i < drawPairs.Count; ++i) {
@@ -218,13 +231,15 @@ namespace SKFX.WorldBuilder {
                     }
 
                     drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
-                    drawData.indirectArguments.Value.SetData(args);
+                    drawData.indirectArguments.SetData(args);
 
-                    drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
+                    drawData.matrixBuffer = new ComputeBuffer((int)startIdx, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
 
                     m_drawData.Add(drawData);
                 }
             }
+
+            Debug.Log($"Generated {totalInstances} instances");
         }
 
         void CleanupDrawData() {
@@ -259,7 +274,7 @@ namespace SKFX.WorldBuilder {
                     m_commandBuffer.SetComputeMatrixParam(m_computeShader, "_MeshOffsetMatrix", drawPair.matrix);
 
                     m_commandBuffer.SetBufferCounterValue(drawData.matrixBuffer, 0);
-                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.Value.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
+                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
 
                     m_commandBuffer.SetGlobalMatrix("_MeshOffsetMatrix", drawPair.matrix);
 

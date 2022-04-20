@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,8 +7,24 @@ using Unity.Jobs;
 
 namespace SKFX.WorldBuilder {
     public abstract class InstanceArea : MonoBehaviour {
-        protected interface IJobContainer : System.IDisposable {
+        protected interface IJobContainer : IDisposable {
             JobHandle Schedule();
+        }
+
+        protected struct JobContainer<T> : IJobContainer where T : struct, IJob, IDisposable {
+            T job;
+
+            public JobContainer(T job) {
+                this.job = job;
+            }
+
+            public void Dispose() {
+                job.Dispose();
+            }
+
+            public JobHandle Schedule() {
+                return job.Schedule();
+            }
         }
 
         public delegate void ChangeEvent(InstanceArea instanceArea);
@@ -44,53 +61,80 @@ namespace SKFX.WorldBuilder {
                 m_seed = seed;
             }
 
-
-
-            /*public struct MyJob : IJob {
-                [ReadOnly]
-                public InstanceArea instanceArea;
-
-                public NativeArray<TransformDetails> result;
-
-                public void Execute() {
-                    TransformDetails details = new TransformDetails();
-                    details.position = instanceArea.RandomPointInArea();
-                    details.rotation = Quaternion.identity;// LookRotation(selectedTriangle.forward, selectedTriangle.normal);
-                    details.uniformScale = 1.0f;
-
-                    result[0] = details;
-                }
-            }*/
-
-
-
-
-
             public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
-                NativeArray<TransformDetails>[] results = new NativeArray<TransformDetails>[m_additiveAreas.Count];
-                IJobContainer[] jobs = new IJobContainer[m_additiveAreas.Count];
-                NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(m_additiveAreas.Count, Allocator.Temp);
+                NativeArray<TransformDetails>[] additiveResults = new NativeArray<TransformDetails>[m_additiveAreas.Count];
+                IJobContainer[] additiveJobs = new IJobContainer[m_additiveAreas.Count];
+                NativeArray<JobHandle> additiveJobHandles = new NativeArray<JobHandle>(m_additiveAreas.Count, Allocator.Temp);
 
+                long totalNumInstances = 0;
                 for (int i = 0; i < m_additiveAreas.Count; ++i) {
                     InstanceArea instanceArea = m_additiveAreas[i];
                     float areaFraction = instanceArea.Area / m_totalArea;
                     long instances = Mathf.FloorToInt(m_instanceCount * areaFraction);
-                    results[i] = new NativeArray<TransformDetails>((int)instances, Allocator.TempJob);
-                    jobs[i] = instanceArea.ScheduleTransformDetailsGeneratorJob(results[i], instances, m_seed); // FIXME, rotate the seed?
-                    jobHandles[i] = jobs[i].Schedule();
+                    if (instances > 0 && instances < int.MaxValue) {
+                        additiveResults[i] = new NativeArray<TransformDetails>((int)instances, Allocator.TempJob);
+                        additiveJobs[i] = instanceArea.CreateTransformDetailsGeneratorJob(additiveResults[i], instances, m_seed); // FIXME, rotate the seed?
+                        additiveJobHandles[i] = additiveJobs[i].Schedule();
+                    } else if (instances > 0) {
+                        Debug.LogError("Instance is exceeding the max instance count... :(");
+                    }
+                    totalNumInstances += instances;
                 }
 
-                JobHandle.CompleteAll(jobHandles);
+                // Urm... weird.
+                if (totalNumInstances >= int.MaxValue) {
+                    Debug.LogError("We are exceeding the max instance count... (or zero) :(");
+                    return startIndex;
+                }
+                if (totalNumInstances < 0) {
+                    return startIndex;
+                }
 
-                long currentStartIndex = startIndex;
+                JobHandle.CompleteAll(additiveJobHandles);
+                additiveJobHandles.Dispose();
+
+                NativeArray<TransformDetails> combinedResults = new NativeArray<TransformDetails>((int)totalNumInstances, Allocator.TempJob);
+
+                int currentIdx = 0;
                 for (int i = 0; i < m_additiveAreas.Count; ++i) {
-                    jobs[i].Dispose();
+                    if (additiveResults[i] != null) {
+                        for (int j = 0; j < additiveResults[i].Length; ++j) {
+                            combinedResults[currentIdx++] = additiveResults[i][j];
+                        }
+                        additiveJobs[i].Dispose();
+                        additiveResults[i].Dispose();
+                    }
+                }
 
-                    for (int j = 0; j < results[i].Length; ++j) {
-                        transformDetailsOut[currentStartIndex + j] = results[i][j];
+                NativeArray<bool>[] subtractiveResults = new NativeArray<bool>[m_subtractiveAreas.Count];
+                IJobContainer[] subtractiveJobs = new IJobContainer[m_subtractiveAreas.Count];
+                NativeArray<JobHandle> subtractiveJobHandles = new NativeArray<JobHandle>(m_subtractiveAreas.Count, Allocator.Temp);
+
+                for (int i = 0; i < m_subtractiveAreas.Count; ++i) {
+                    InstanceArea instanceArea = m_subtractiveAreas[i];
+                    subtractiveResults[i] = new NativeArray<bool>(combinedResults.Length, Allocator.TempJob);
+                    subtractiveJobs[i] = instanceArea.CreateTransformDetailsFilterJob(combinedResults, subtractiveResults[i]);
+                    subtractiveJobHandles[i] = subtractiveJobs[i].Schedule();
+                }
+
+                JobHandle.CompleteAll(subtractiveJobHandles);
+                subtractiveJobHandles.Dispose();
+
+                long currentOutIndex = startIndex;
+                for (int i = 0; i < combinedResults.Length; ++i) {
+                    bool pass = true;
+                    for (int j = 0; j < m_subtractiveAreas.Count; ++j) {
+                        if (subtractiveResults[j][i] == true) {
+                            pass = false;
+                            break;
+                        }
+                    }
+
+                    if (pass) {
+                        transformDetailsOut[currentOutIndex] = combinedResults[i];
 
                         if (snapLayerMask > 0) {
-                            ref TransformDetails details = ref transformDetailsOut[currentStartIndex + j];
+                            ref TransformDetails details = ref transformDetailsOut[currentOutIndex];
 
                             Vector3 normal = details.rotation * Vector3.up;
                             RaycastHit hit;
@@ -100,13 +144,19 @@ namespace SKFX.WorldBuilder {
                                 details.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
                             }
                         }
-                    }
 
-                    currentStartIndex += results[i].Length;
-                    results[i].Dispose();
+                        ++currentOutIndex;
+                    }
                 }
 
-                return currentStartIndex;
+                for (int i = 0; i < m_subtractiveAreas.Count; ++i) {
+                    subtractiveResults[i].Dispose();
+                    subtractiveJobs[i].Dispose();
+                }
+
+                combinedResults.Dispose();
+
+                return currentOutIndex;
             }
         }
 
@@ -134,8 +184,8 @@ namespace SKFX.WorldBuilder {
         protected abstract float Area { get; }
         protected abstract Vector3 RandomPointInArea();
 
-        protected abstract IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed);
-        //protected abstract IJobContainer ScheduleTransformDetailsFilterJob(NativeArray<TransformDetails> details);
+        protected abstract IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed);
+        protected abstract IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap);
 
 
         //        protected abstract bool TestPointInArea(Vector3 point);

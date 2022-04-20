@@ -59,42 +59,45 @@ namespace SKFX.WorldBuilder {
 
                 for (long i = 0; i < endIdx; ++i) {
                     TransformDetails transformDetails = allTransformDetails[i];
-                    foreach (Collider collider in prefabColliders) {
-                        System.Type colliderType = collider.GetType();
 
-                        if (colliderType == typeof(MeshCollider)) {
-                            Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
+                    if (transformDetails.uniformScale > 0.0f) {
+                        foreach (Collider collider in prefabColliders) {
+                            System.Type colliderType = collider.GetType();
 
-                            MeshCollider cloneCollider = collider as MeshCollider;
+                            if (colliderType == typeof(MeshCollider)) {
+                                Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
 
-                            CombineInstance combineInstance = new CombineInstance();
-                            combineInstance.mesh = cloneCollider.sharedMesh;
-                            combineInstance.transform = matrix;
-                            combineInstances.Add(combineInstance);
-                        } else {
-                            GameObject newColliderHost = new GameObject("Host");
-                            newColliderHost.transform.SetParent(host.transform);
-                            newColliderHost.transform.position = transformDetails.position;
-                            newColliderHost.transform.rotation = transformDetails.rotation;
-                            newColliderHost.transform.localScale = Vector3.one * transformDetails.uniformScale; // FIXME, we need to add the matrix for the child....
+                                MeshCollider cloneCollider = collider as MeshCollider;
 
-                            if (colliderType == typeof(BoxCollider)) {
-                                BoxCollider cloneCollider = collider as BoxCollider;
-                                BoxCollider newCollider = newColliderHost.AddComponent<BoxCollider>();
-                                newCollider.center = cloneCollider.center;
-                                newCollider.size = cloneCollider.size;
-                            } else if (colliderType == typeof(SphereCollider)) {
-                                SphereCollider cloneCollider = collider as SphereCollider;
-                                SphereCollider newCollider = newColliderHost.AddComponent<SphereCollider>();
-                                newCollider.center = cloneCollider.center;
-                                newCollider.radius = cloneCollider.radius;
-                            } else if (colliderType == typeof(CapsuleCollider)) {
-                                CapsuleCollider cloneCollider = collider as CapsuleCollider;
-                                CapsuleCollider newCollider = newColliderHost.AddComponent<CapsuleCollider>();
-                                newCollider.center = cloneCollider.center;
-                                newCollider.direction = cloneCollider.direction;
-                                newCollider.height = cloneCollider.height;
-                                newCollider.radius = cloneCollider.radius;
+                                CombineInstance combineInstance = new CombineInstance();
+                                combineInstance.mesh = cloneCollider.sharedMesh;
+                                combineInstance.transform = matrix;
+                                combineInstances.Add(combineInstance);
+                            } else {
+                                GameObject newColliderHost = new GameObject("Host");
+                                newColliderHost.transform.SetParent(host.transform);
+                                newColliderHost.transform.position = transformDetails.position;
+                                newColliderHost.transform.rotation = transformDetails.rotation;
+                                newColliderHost.transform.localScale = Vector3.one * transformDetails.uniformScale; // FIXME, we need to add the matrix for the child....
+
+                                if (colliderType == typeof(BoxCollider)) {
+                                    BoxCollider cloneCollider = collider as BoxCollider;
+                                    BoxCollider newCollider = newColliderHost.AddComponent<BoxCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.size = cloneCollider.size;
+                                } else if (colliderType == typeof(SphereCollider)) {
+                                    SphereCollider cloneCollider = collider as SphereCollider;
+                                    SphereCollider newCollider = newColliderHost.AddComponent<SphereCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.radius = cloneCollider.radius;
+                                } else if (colliderType == typeof(CapsuleCollider)) {
+                                    CapsuleCollider cloneCollider = collider as CapsuleCollider;
+                                    CapsuleCollider newCollider = newColliderHost.AddComponent<CapsuleCollider>();
+                                    newCollider.center = cloneCollider.center;
+                                    newCollider.direction = cloneCollider.direction;
+                                    newCollider.height = cloneCollider.height;
+                                    newCollider.radius = cloneCollider.radius;
+                                }
                             }
                         }
                     }

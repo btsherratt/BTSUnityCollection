@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -34,7 +35,7 @@ namespace SKFX.WorldBuilder {
             }
 
             public Vector3 RandomPoint() {
-                return RandomPoint(Random.value, Random.value);
+                return RandomPoint(UnityEngine.Random.value, UnityEngine.Random.value);
             }
 
             public Vector3 RandomPoint(float rndA, float rndB) {
@@ -73,29 +74,16 @@ namespace SKFX.WorldBuilder {
             }
         }
 
-        struct JobContainer : IJobContainer {
-            TransformDetailsGeneratorJob job;
-
-            public JobContainer(TransformDetailsGeneratorJob job) {
-                this.job = job;
-            }
-
-            public void Dispose() {
-                job.triangles.Dispose();
-            }
-
-            public JobHandle Schedule() {
-                return job.Schedule();
-            }
-        }
-
         [BurstCompile(CompileSynchronously = true)]
-        struct TransformDetailsGeneratorJob : IJob {
+        struct TransformDetailsGeneratorJob : IJob, IDisposable {
             [ReadOnly]
             public uint randomSeed;
 
             [ReadOnly]
             public NativeArray<Triangle> triangles;
+
+            [ReadOnly]
+            public long instanceCount;
 
             [ReadOnly]
             public float area;
@@ -108,21 +96,72 @@ namespace SKFX.WorldBuilder {
 
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
-                int startIdx = 0;
+                long startIdx = 0;
+
                 for (int i = 0; i < triangles.Length; ++i) {
                     Triangle triangle = triangles[i];
                     float areaFraction = triangle.area / area;
-                    int instances = (int)(Output.Length * areaFraction);
+                    long instances = (long)(instanceCount * areaFraction + 0.5f);
+                    instances = Mathf.Min((int)instances, (int)(instanceCount - startIdx));
                     for (int j = 0; j < instances; ++j) {
                         Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
                         TransformDetails details = new TransformDetails();
                         details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
-                        Output[startIdx + j] = details;
+                        Output[(int)(startIdx + j)] = details;
                     }
                     startIdx += instances;
                 }
             }
+
+            public void Dispose() {
+                triangles.Dispose();
+            }
         }
+
+
+        [BurstCompile(CompileSynchronously = true)]
+        struct TransformDetailsFilterJob : IJob, IDisposable {
+            [ReadOnly]
+            public NativeArray<Triangle> triangles;
+
+            [ReadOnly]
+            public Bounds bounds;
+
+            [ReadOnly]
+            public Matrix4x4 matrix;
+
+            [ReadOnly]
+            public NativeArray<TransformDetails> Input;
+
+            [WriteOnly]
+            public NativeArray<bool> Output;
+
+            public void Execute() {
+                for (int i = 0; i < Output.Length; ++i) {
+                    Vector3 point = matrix * Input[i].position;
+
+                    bool test = false;
+
+                    point.y = bounds.center.y;
+                    if (bounds.SqrDistance(point) <= float.Epsilon) {
+                        //Vector3 localPoint = transform.InverseTransformPoint(point);
+                        foreach (Triangle t in triangles) {
+                            if (t.ContainsPoint(point)) {
+                                test = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    Output[i] = test;
+                }
+            }
+
+            public void Dispose() {
+                triangles.Dispose();
+            }
+        }
+
 
         Triangle[] m_cachedTriangles;
         float m_cachedArea;
@@ -162,23 +201,71 @@ namespace SKFX.WorldBuilder {
 
         protected abstract Triangle[] GenerateTriangles();
 
-        protected override IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
             RegenerateTriangles();
+
+            Debug.Assert(instanceCount < int.MaxValue);
 
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
             job.randomSeed = randomSeed;
+            job.instanceCount = instanceCount;
             job.triangles = new NativeArray<Triangle>(m_cachedTriangles, Allocator.TempJob);
             job.area = m_cachedArea;
             job.matrix = transform.localToWorldMatrix;
             job.Output = details;
 
-            return new JobContainer(job);
+            return new JobContainer<TransformDetailsGeneratorJob>(job);
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+            TransformDetailsFilterJob job = new TransformDetailsFilterJob();
+            job.triangles = new NativeArray<Triangle>(m_cachedTriangles, Allocator.TempJob);
+            job.bounds = m_cachedBounds;
+            job.matrix = transform.localToWorldMatrix;
+            job.Input = details;
+            job.Output = overlap;
+
+            return new JobContainer<TransformDetailsFilterJob>(job);
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         protected override Vector3 RandomPointInArea() {
             RegenerateTriangles();
 
-            float random = Random.Range(0, m_cachedArea);
+            float random = UnityEngine.Random.Range(0, m_cachedArea);
 
             Triangle selectedTriangle = new Triangle();
             foreach (Triangle t in m_cachedTriangles) {

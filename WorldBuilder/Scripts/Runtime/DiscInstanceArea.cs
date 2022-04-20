@@ -1,30 +1,14 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
-
 namespace SKFX.WorldBuilder {
     [ExecuteInEditMode]
     public class DiscInstanceArea : InstanceArea {
-        struct JobContainer : IJobContainer {
-            TransformDetailsGeneratorJob job;
-
-            public JobContainer(TransformDetailsGeneratorJob job) {
-                this.job = job;
-            }
-
-            public void Dispose() {
-                // Don't need to do anything
-            }
-
-            public JobHandle Schedule() {
-                return job.Schedule();
-            }
-        }
-
         [BurstCompile(CompileSynchronously = true)]
-        struct TransformDetailsGeneratorJob : IJob {
+        struct TransformDetailsGeneratorJob : IJob, IDisposable {
             [ReadOnly]
             public uint randomSeed;
 
@@ -49,6 +33,41 @@ namespace SKFX.WorldBuilder {
                     Output[i] = details;
                 }
             }
+
+            public void Dispose() {
+                // Don't need to do anything
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true)]
+        struct TransformDetailsFilterJob : IJob, IDisposable {
+            [ReadOnly]
+            public Vector3 center;
+
+            [ReadOnly]
+            public float radius;
+
+            [ReadOnly]
+            public Matrix4x4 matrix;
+
+            [ReadOnly]
+            public NativeArray<TransformDetails> Input;
+
+            [WriteOnly]
+            public NativeArray<bool> Output;
+
+            public void Execute() {
+                for (int i = 0; i < Output.Length; ++i) {
+                    Vector3 point = matrix * Input[i].position;
+                    Vector3 delta = point - center;
+                    bool test = delta.sqrMagnitude <= radius * radius;
+                    Output[i] = test;
+                }
+            }
+
+            public void Dispose() {
+                // Don't need to do anything
+            }
         }
 
         public Vector3 m_center = Vector3.zero;
@@ -56,7 +75,7 @@ namespace SKFX.WorldBuilder {
 
         protected override float Area => Mathf.PI * m_radius * m_radius;
 
-        protected override IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
             job.randomSeed = randomSeed;
             job.center = m_center;
@@ -64,11 +83,22 @@ namespace SKFX.WorldBuilder {
             job.matrix = transform.localToWorldMatrix;
             job.Output = details;
 
-            return new JobContainer(job);
+            return new JobContainer<TransformDetailsGeneratorJob>(job);
+        }
+
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+            TransformDetailsFilterJob job = new TransformDetailsFilterJob();
+            job.center = m_center;
+            job.radius = m_radius;
+            job.matrix = transform.localToWorldMatrix;
+            job.Input = details;
+            job.Output = overlap;
+
+            return new JobContainer<TransformDetailsFilterJob>(job);
         }
 
         protected override Vector3 RandomPointInArea() {
-            Vector2 point = Random.insideUnitCircle * m_radius;
+            Vector2 point = UnityEngine.Random.insideUnitCircle * m_radius;
             Vector3 position = transform.position + new Vector3(point.x, 0, point.y);
             return position;
         }
