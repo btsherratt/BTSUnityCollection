@@ -23,10 +23,10 @@ namespace SKFX.WorldBuilder {
         struct DrawData {
             public DrawPair[] drawPairs;
 
-            public ComputeBuffer unculledDataBuffer;
+            public SafeDisposable<ComputeBuffer> unculledDataBuffer;
 
-            public ComputeBuffer indirectArguments;
-            public ComputeBuffer matrixBuffer;
+            public SafeDisposable<ComputeBuffer> indirectArguments;
+            public SafeDisposable<ComputeBuffer> matrixBuffer;
         }
 
         /*[StructLayout(LayoutKind.Explicit, Pack = 1, Size = InstanceDetails.Size)]
@@ -206,7 +206,7 @@ namespace SKFX.WorldBuilder {
                             allInstanceDetails[count++] = d;
                         }*/
                     }
-                    drawData.unculledDataBuffer.SetData(allInstanceDetails);
+                    drawData.unculledDataBuffer.Value.SetData(allInstanceDetails);
 
                     uint[] args = new uint[drawPairs.Count * 5];
                     for (int i = 0; i < drawPairs.Count; ++i) {
@@ -218,7 +218,7 @@ namespace SKFX.WorldBuilder {
                     }
 
                     drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
-                    drawData.indirectArguments.SetData(args);
+                    drawData.indirectArguments.Value.SetData(args);
 
                     drawData.matrixBuffer = new ComputeBuffer(roundedElements, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
 
@@ -230,9 +230,9 @@ namespace SKFX.WorldBuilder {
         void CleanupDrawData() {
             if (m_drawData != null) {
                 foreach (DrawData drawData in m_drawData) {
-                    drawData.indirectArguments.Release();
-                    drawData.unculledDataBuffer.Release();
-                    drawData.matrixBuffer.Release();
+                    drawData.indirectArguments.Dispose();
+                    drawData.unculledDataBuffer.Dispose();
+                    drawData.matrixBuffer.Dispose();
                 }
                 m_drawData = null;
             }
@@ -259,7 +259,7 @@ namespace SKFX.WorldBuilder {
                     m_commandBuffer.SetComputeMatrixParam(m_computeShader, "_MeshOffsetMatrix", drawPair.matrix);
 
                     m_commandBuffer.SetBufferCounterValue(drawData.matrixBuffer, 0);
-                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
+                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.Value.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
 
                     m_commandBuffer.SetGlobalMatrix("_MeshOffsetMatrix", drawPair.matrix);
 

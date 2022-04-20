@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using Unity.Collections;
 
 public class Spline : MonoBehaviour {
     public enum Units {
@@ -7,7 +8,7 @@ public class Spline : MonoBehaviour {
         World
     }
 
-    public struct SplinePoint {
+    struct SplinePoint {
         public Vector3 position;
         public Vector3 forward;
         public float distance;
@@ -21,11 +22,166 @@ public class Spline : MonoBehaviour {
         }
     }
 
-    public struct SplineSegment {
-        public float length;
+    struct SplineSegment {
         public float worldLength;
         public Bounds bounds;
-        public SplinePoint[] points;
+        public int startPoint;
+        public int numPoints;
+        
+        public SplineSegment(float worldLength, Bounds bounds, int startPoint, int numPoints) {
+            this.worldLength = worldLength;
+            this.bounds = bounds;
+            this.startPoint = startPoint;
+            this.numPoints = numPoints;
+        }
+    }
+
+    public struct SplineImpl : System.IDisposable {
+        public float Length => m_cachedLength;
+
+        NativeArray<Vector3> m_controlPoints;
+        NativeArray<SplineSegment> m_cachedSpline;
+        NativeArray<SplinePoint> m_cachedPoints;
+        float m_cachedLength;
+
+        float m_alpha;
+        float m_lengthTolerance;
+        int m_lengthMaximumDepth;
+
+        public Vector3 Lerp(float t, Units units) {
+            return Lerp(out _, t, units);
+        }
+
+        public Vector3 Lerp(out Vector3 forward, float t, Units units) {
+            float relativeToSegmentT = 0.0f;
+
+            switch (units) {
+                case Units.ZeroToOne:
+                    relativeToSegmentT = t * m_controlPoints.Length; // FIXME, this isn't correct
+                    break;
+
+                case Units.ZeroToSegments:
+                    relativeToSegmentT = t;
+                    break;
+
+                case Units.World:
+                    // Just in case...
+                    relativeToSegmentT = m_controlPoints.Length;
+
+                    // FIXME, terrible...
+                    for (int i = 0; i < m_cachedSpline.Length; ++i) {
+                        float segmentWorldLength = m_cachedSpline[i].worldLength;
+                        if (t < segmentWorldLength) {
+                            relativeToSegmentT = i + t / segmentWorldLength;
+                            break;
+                        } else {
+                            t -= segmentWorldLength;
+                        }
+                    }
+                    break;
+            }
+
+            if (relativeToSegmentT <= 0) {
+                forward = m_cachedPoints[m_cachedSpline[0].startPoint].forward;
+                return m_controlPoints[0];
+            } else if (relativeToSegmentT >= m_controlPoints.Length) {
+                forward = m_cachedPoints[m_cachedSpline[0].startPoint].forward; // FIXME, WRONG THING
+                return m_controlPoints[m_controlPoints.Length - 1];
+            } else {
+                int idx = Mathf.FloorToInt(relativeToSegmentT);
+                relativeToSegmentT -= idx;
+                SplineSegment segment = m_cachedSpline[idx];
+
+                int pointIdx = segment.startPoint;
+                for (; pointIdx < segment.startPoint + segment.numPoints - 2; ++pointIdx) {
+                    float length = m_cachedPoints[pointIdx + 1].distance; // FIXME, confusing...
+                    if (relativeToSegmentT < length) {
+                        break;
+                    } else {
+                        // relativeToSegmentT -= length;
+                    }
+                }
+
+                float pt = Mathf.InverseLerp(m_cachedPoints[pointIdx].distance, m_cachedPoints[pointIdx + 1].distance, relativeToSegmentT);
+                forward = Vector3.Lerp(m_cachedPoints[pointIdx].forward, m_cachedPoints[pointIdx + 1].forward, pt);
+                return Vector3.Lerp(m_cachedPoints[pointIdx].position, m_cachedPoints[pointIdx + 1].position, pt);
+            }
+        }
+
+        public bool TestDistanceToSpline(Vector3 position, float distance) {
+            return TestDistanceToSpline(position, distance, Vector3.one);
+        }
+
+        public bool TestDistanceToSpline(Vector3 position, float distance, Vector3 componentContribution) {
+            Vector3 testPosition = Vector3.Scale(position, componentContribution);
+            foreach (SplineSegment splineSegment in m_cachedSpline) {
+               Vector3 boundsTestPosition = testPosition;// testPosition.XZ(); // FIXME
+               boundsTestPosition.x = Mathf.Lerp(splineSegment.bounds.center.x, testPosition.x, componentContribution.x);
+               boundsTestPosition.y = Mathf.Lerp(splineSegment.bounds.center.y, testPosition.y, componentContribution.y);
+               boundsTestPosition.z = Mathf.Lerp(splineSegment.bounds.center.z, testPosition.z, componentContribution.z);
+
+               if (splineSegment.bounds.SqrDistance(boundsTestPosition) <= (distance * distance)) {
+                    for (int i = splineSegment.startPoint; i < splineSegment.startPoint + splineSegment.numPoints - 1; ++i) {
+                        SplinePoint point1 = m_cachedPoints[i];
+                        SplinePoint point2 = m_cachedPoints[i + 1];
+                        Vector3 testPoint1 = Vector3.Scale(point1.position, componentContribution);
+                        Vector3 testPoint2 = Vector3.Scale(point2.position, componentContribution);
+                        if (MathFFS.DistanceLineSegmentSq(testPoint1, testPoint2, testPosition) <= distance * distance) {
+                            return true;
+                        }
+                    }
+               }
+            }
+
+            return false;
+        }
+
+        Interpolater SegmentInterpolater(int segmentIdx) {
+            int numSegments = m_controlPoints.Length;
+            Vector3 P0 = m_controlPoints[Mathf.Clamp(segmentIdx - 1, 0, numSegments - 1)];
+            Vector3 P1 = m_controlPoints[segmentIdx];
+            Vector3 P2 = m_controlPoints[Mathf.Clamp(segmentIdx + 1, 0, numSegments - 1)];
+            Vector3 P3 = m_controlPoints[Mathf.Clamp(segmentIdx + 2, 0, numSegments - 1)];
+
+            Interpolater interpolater = Interpolater.Construct(P0, P1, P2, P3, m_alpha);
+            return interpolater;
+        }
+
+        public SplineImpl(Allocator allocator, Vector3[] controlPoints, float alpha, float lengthTolerance, int lengthMaximumDepth) {
+            m_controlPoints = new NativeArray<Vector3>(controlPoints, allocator);
+            m_alpha = alpha;
+            m_lengthTolerance = lengthTolerance;
+            m_lengthMaximumDepth = lengthMaximumDepth;
+
+            int numSegments = m_controlPoints.Length - 1;
+
+            m_cachedSpline = new NativeArray<SplineSegment>(numSegments, allocator);
+            m_cachedLength = 0.0f;
+
+            m_cachedPoints = new NativeArray<SplinePoint>(numSegments * m_lengthMaximumDepth, allocator);
+
+            int pointsStartIdx = 0;
+            for (int segmentIdx = 0; segmentIdx < numSegments; ++segmentIdx) {
+                Interpolater interpolater = SegmentInterpolater(segmentIdx);
+
+                Bounds bounds;
+                float length;
+
+                int numPoints = interpolater.Generate(m_cachedPoints, pointsStartIdx, out bounds, out length, m_lengthTolerance, m_lengthMaximumDepth);
+                SplineSegment segment = new SplineSegment(length, bounds, pointsStartIdx, numPoints);
+                m_cachedSpline[segmentIdx] = segment;
+
+                m_cachedLength += length;
+
+                pointsStartIdx += numPoints;
+            }
+        }
+
+        public void Dispose() {
+            m_controlPoints.Dispose();
+            m_cachedSpline.Dispose();
+            m_cachedPoints.Dispose();
+        }
     }
 
     struct Interpolater {
@@ -75,25 +231,24 @@ public class Spline : MonoBehaviour {
             return C;
         }
 
-        public SplinePoint[] Generate(out Bounds bounds, out float length, float tolerance, int maxSteps, SplinePoint[] pointBuffer) {
-            SplinePoint[] points = pointBuffer;
+        public int Generate(NativeArray<SplinePoint> points, int pointsStartIdx, out Bounds bounds, out float length, float tolerance, int maxSteps) {
+            SplinePoint firstPoint = new SplinePoint(Lerp(0.0f), Vector3.forward, 0, 0); 
+            points[pointsStartIdx] = firstPoint;
 
-            points[0] = new SplinePoint(Lerp(0.0f), Vector3.forward, 0, 0);
-
-            bounds = new Bounds(points[0].position, Vector3.zero);
+            bounds = new Bounds(points[pointsStartIdx].position, Vector3.zero);
 
             float previousLength = 0.0f;
             int numPoints;
             for (numPoints = 2; numPoints < maxSteps; ++numPoints) {
                 float currentLength = 0.0f;
-                Vector3 previousPosition = points[0].position;
+                Vector3 previousPosition = points[pointsStartIdx].position;
                 for (int i = 1; i < numPoints; ++i) {
                     float t = i / (float)(numPoints - 1);
                     Vector3 position = Lerp(t);
                     float distance = Vector3.Distance(previousPosition, position);
                     currentLength += distance;
-                    Vector3 forward = points[i - 1].position - position;
-                    points[i] = new SplinePoint(position, forward, t, currentLength);
+                    Vector3 forward = points[pointsStartIdx + i - 1].position - position;
+                    points[pointsStartIdx + i] = new SplinePoint(position, forward, t, currentLength);
 
                     bounds.Encapsulate(position);
                     previousPosition = position;
@@ -106,15 +261,12 @@ public class Spline : MonoBehaviour {
                 }
             }
 
-            points[0].forward = -(points[1].position - points[0].position).normalized;
+            firstPoint.forward = -(points[pointsStartIdx + 1].position - points[pointsStartIdx].position).normalized;
+            points[pointsStartIdx] = firstPoint;
 
             length = previousLength;
 
-            SplinePoint[] output = new SplinePoint[numPoints];
-            for (int i = 0; i < numPoints; ++i) {
-                output[i] = points[i];
-            }
-            return output;
+            return numPoints;
         }
     }
 
@@ -131,82 +283,19 @@ public class Spline : MonoBehaviour {
     public delegate void SplineUpdateEvent(Spline spline);
     public static event SplineUpdateEvent ms_updateEvent;
 
-    public float Length {
-        get {
-            CacheSpline();
-            return m_cachedLength;
-        }
-    }
+    public float Length => CachedSplineImpl().Length;
 
     //float[] segmentLengths;
     //float length;
 
-    SplineSegment[] m_cachedSpline;
-    float m_cachedLength;
+    SafeDisposable<SplineImpl>? m_cachedSpline;
 
     public Vector3 Lerp(float t, Units units) {
         return Lerp(out _, t, units);
     }
     
     public Vector3 Lerp(out Vector3 forward, float t, Units units) {
-        CacheSpline();
-
-        float relativeToSegmentT = 0.0f;
-
-        switch (units) {
-            case Units.ZeroToOne:
-                relativeToSegmentT = t * m_controlPoints.Length; // FIXME, this isn't correct
-                break;
-
-            case Units.ZeroToSegments:
-                relativeToSegmentT = t;
-                break;
-
-            case Units.World:
-                // Just in case...
-                relativeToSegmentT = m_controlPoints.Length;
-
-                // FIXME, terrible...
-                for (int i = 0; i < m_cachedSpline.Length; ++i) {
-                    float segmentWorldLength = m_cachedSpline[i].worldLength;
-                    if (t < segmentWorldLength) {
-                        relativeToSegmentT = i + t / segmentWorldLength;
-                        break;
-                    } else {
-                        t -= segmentWorldLength;
-                    }
-                }
-                break;
-        }
-
-        if (relativeToSegmentT <= 0) {
-            forward = m_cachedSpline[0].points[0].forward;
-            return m_controlPoints[0];
-        } else if (relativeToSegmentT >= m_controlPoints.Length) {
-            forward = m_cachedSpline[0].points[0].forward; // FIXME, WRONG THING
-            return m_controlPoints[m_controlPoints.Length - 1];
-        } else {
-            int idx = Mathf.FloorToInt(relativeToSegmentT);
-            relativeToSegmentT -= idx;
-            SplineSegment segment = m_cachedSpline[idx];
-
-            int pointIdx = 0;
-            for (; pointIdx < segment.points.Length - 2; ++pointIdx) {
-                float length = segment.points[pointIdx + 1].distance; // FIXME, confusing...
-                if (relativeToSegmentT < length) {
-                    break;
-                } else {
-                   // relativeToSegmentT -= length;
-                }
-            }
-
-            float pt = Mathf.InverseLerp(segment.points[pointIdx].distance, segment.points[pointIdx + 1].distance, relativeToSegmentT);
-            forward = Vector3.Lerp(segment.points[pointIdx].forward, segment.points[pointIdx + 1].forward, pt);
-            return Vector3.Lerp(segment.points[pointIdx].position, segment.points[pointIdx + 1].position, pt);
-
-            //Interpolater interpolater = SegmentInterpolater(idx);
-            //return interpolater.Lerp(relativeToSegmentT - idx);
-        }
+        return CachedSplineImpl().Lerp(out forward, t, units);
     }
 
     //public float ClosestPositionOnSpline(Vector3 point, Units units) {
@@ -242,34 +331,16 @@ public class Spline : MonoBehaviour {
     }
 
     public bool TestDistanceToSpline(Vector3 position, float distance, Vector3 componentContribution) {
-        CacheSpline();
-
-        Vector3 testPosition = Vector3.Scale(position, componentContribution);
-        foreach (SplineSegment splineSegment in m_cachedSpline) {
-            Vector3 boundsTestPosition = testPosition;// testPosition.XZ(); // FIXME
-            boundsTestPosition.x = Mathf.Lerp(splineSegment.bounds.center.x, testPosition.x, componentContribution.x);
-            boundsTestPosition.y = Mathf.Lerp(splineSegment.bounds.center.y, testPosition.y, componentContribution.y);
-            boundsTestPosition.z = Mathf.Lerp(splineSegment.bounds.center.z, testPosition.z, componentContribution.z);
-
-            if (splineSegment.bounds.SqrDistance(boundsTestPosition) <= (distance * distance)) {
-                for (int i = 0; i < splineSegment.points.Length - 1; ++i) {
-                    SplinePoint point1 = splineSegment.points[i];
-                    SplinePoint point2 = splineSegment.points[i + 1];
-                    Vector3 testPoint1 = Vector3.Scale(point1.position, componentContribution);
-                    Vector3 testPoint2 = Vector3.Scale(point2.position, componentContribution);
-                    if (MathFFS.DistanceLineSegmentSq(testPoint1, testPoint2, testPosition) <= distance * distance) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        return CachedSplineImpl().TestDistanceToSpline(position, distance, componentContribution);
     }
 
 
     private void OnValidate() {
-        m_cachedSpline = null;
+        if (m_cachedSpline != null) {
+            m_cachedSpline.Value.Dispose();
+            m_cachedSpline = null;
+        }
+
         if (ms_updateEvent != null) {
             ms_updateEvent(this);
         }
@@ -280,21 +351,15 @@ public class Spline : MonoBehaviour {
 
 
     private void OnDrawGizmos() {
-        CacheSpline();
+        CachedSplineImpl();
 
         if (m_cachedSpline != null) {
-            for (int i = 0; i < m_cachedSpline.Length; ++i) {
-                for (int j = 1; j < m_cachedSpline[i].points.Length; ++j) {
-                    Gizmos.DrawLine(transform.TransformPoint(m_cachedSpline[i].points[j - 1].position), transform.TransformPoint(m_cachedSpline[i].points[j].position));
-                }
+            SplineImpl spline = m_cachedSpline.Value;
+
+            for (int i = 1; i < spline.Length; ++i) {
+                Gizmos.DrawLine(transform.TransformPoint(spline.Lerp(i - 1, Units.World)), transform.TransformPoint(spline.Lerp(i, Units.World)));
             }
         }
-        /*if (cachedSpline == null)
-        {
-            cachedSpline = GenerateSpline();
-        }
-
-        */
     }
 
     /*public SplinePoint[] GenerateSpline() {
@@ -325,41 +390,15 @@ public class Spline : MonoBehaviour {
         return splineSlice;
     }*/
 
-    Interpolater SegmentInterpolater(int segmentIdx) {
-        int numSegments = m_controlPoints.Length;
-        Vector3 P0 = m_controlPoints[Mathf.Clamp(segmentIdx - 1, 0, numSegments - 1)];
-        Vector3 P1 = m_controlPoints[segmentIdx];
-        Vector3 P2 = m_controlPoints[Mathf.Clamp(segmentIdx + 1, 0, numSegments - 1)];
-        Vector3 P3 = m_controlPoints[Mathf.Clamp(segmentIdx + 2, 0, numSegments - 1)];
-
-        Interpolater interpolater = Interpolater.Construct(P0, P1, P2, P3, m_alpha);
-        return interpolater;
+    public SplineImpl CachedSplineImpl() {
+        if (m_cachedSpline == null) {
+            m_cachedSpline = GetSplineImpl(Allocator.Persistent);
+        }
+        return m_cachedSpline.Value;
     }
 
-    void CacheSpline() {
-        if (m_controlPoints != null && m_controlPoints.Length > 0 && m_cachedSpline == null) {
-            SplinePoint[] pointBuffer = new SplinePoint[m_lengthMaximumDepth];
-
-            int numSegments = m_controlPoints.Length - 1;
-
-            m_cachedSpline = new SplineSegment[numSegments];
-            m_cachedLength = 0.0f;
-
-            for (int segmentIdx = 0; segmentIdx < numSegments; ++segmentIdx) {
-                Interpolater interpolater = SegmentInterpolater(segmentIdx);
-
-                Bounds bounds;
-                float length;
-                SplinePoint[] points = interpolater.Generate(out bounds, out length, m_lengthTolerance, m_lengthMaximumDepth, pointBuffer);
-
-                m_cachedLength += length;
-
-                ref SplineSegment segment = ref m_cachedSpline[segmentIdx];
-                segment.bounds = bounds;
-                segment.worldLength = length;
-                segment.points = points;
-            }
-        }
+    public SplineImpl GetSplineImpl(Allocator allocator) {
+        return new SplineImpl(allocator, m_controlPoints, m_alpha, m_lengthTolerance, m_lengthMaximumDepth);
     }
 }
 

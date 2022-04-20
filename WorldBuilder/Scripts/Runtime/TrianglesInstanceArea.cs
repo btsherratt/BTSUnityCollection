@@ -1,4 +1,6 @@
-using System.Collections.Generic;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 
 namespace SKFX.WorldBuilder {
@@ -32,9 +34,10 @@ namespace SKFX.WorldBuilder {
             }
 
             public Vector3 RandomPoint() {
-                float rndA = Random.value;
-                float rndB = Random.value;
+                return RandomPoint(Random.value, Random.value);
+            }
 
+            public Vector3 RandomPoint(float rndA, float rndB) {
                 Vector3 position;
                 if (rndA + rndB <= 1.0f) {
                     Vector3 rnd = deltaA * rndA + deltaB * rndB;
@@ -67,6 +70,57 @@ namespace SKFX.WorldBuilder {
                 float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
 
                 return (u >= 0) && (v >= 0) && (u + v < 1);
+            }
+        }
+
+        struct JobContainer : IJobContainer {
+            TransformDetailsGeneratorJob job;
+
+            public JobContainer(TransformDetailsGeneratorJob job) {
+                this.job = job;
+            }
+
+            public void Dispose() {
+                job.triangles.Dispose();
+            }
+
+            public JobHandle Schedule() {
+                return job.Schedule();
+            }
+        }
+
+        [BurstCompile(CompileSynchronously = true)]
+        struct TransformDetailsGeneratorJob : IJob {
+            [ReadOnly]
+            public uint randomSeed;
+
+            [ReadOnly]
+            public NativeArray<Triangle> triangles;
+
+            [ReadOnly]
+            public float area;
+
+            [ReadOnly]
+            public Matrix4x4 matrix;
+
+            [WriteOnly]
+            public NativeArray<TransformDetails> Output;
+
+            public void Execute() {
+                Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
+                int startIdx = 0;
+                for (int i = 0; i < triangles.Length; ++i) {
+                    Triangle triangle = triangles[i];
+                    float areaFraction = triangle.area / area;
+                    int instances = (int)(Output.Length * areaFraction);
+                    for (int j = 0; j < instances; ++j) {
+                        Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
+                        TransformDetails details = new TransformDetails();
+                        details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
+                        Output[startIdx + j] = details;
+                    }
+                    startIdx += instances;
+                }
             }
         }
 
@@ -107,6 +161,19 @@ namespace SKFX.WorldBuilder {
         }
 
         protected abstract Triangle[] GenerateTriangles();
+
+        protected override IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+            RegenerateTriangles();
+
+            TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
+            job.randomSeed = randomSeed;
+            job.triangles = new NativeArray<Triangle>(m_cachedTriangles, Allocator.TempJob);
+            job.area = m_cachedArea;
+            job.matrix = transform.localToWorldMatrix;
+            job.Output = details;
+
+            return new JobContainer(job);
+        }
 
         protected override Vector3 RandomPointInArea() {
             RegenerateTriangles();

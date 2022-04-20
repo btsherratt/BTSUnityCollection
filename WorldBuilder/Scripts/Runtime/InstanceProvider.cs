@@ -57,7 +57,7 @@ namespace SKFX.WorldBuilder {
             }
         }
 
-        public int m_seed;
+        public uint m_seed;
 
         public List<InstancePrefabConfiguration> m_prefabConfigurations;
 
@@ -78,7 +78,7 @@ namespace SKFX.WorldBuilder {
             }
             areas = filteredAreas.ToArray();
 
-            int seed = m_seed;
+            uint seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {
                 ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed, configuration.m_instancesPerUnit);
                 InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider, 1 << m_snapLayer);
@@ -89,7 +89,7 @@ namespace SKFX.WorldBuilder {
 
         private void OnValidate() {
             if (m_seed == 0) {
-                m_seed = (int)System.DateTime.Now.Ticks;
+                m_seed = (uint)System.DateTime.Now.Ticks;
             }
             if (ms_changeEvent != null) {
                 ms_changeEvent(this);

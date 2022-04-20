@@ -1,22 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+using Unity.Collections;
+using Unity.Jobs;
+
 namespace SKFX.WorldBuilder {
     public abstract class InstanceArea : MonoBehaviour {
+        protected interface IJobContainer : System.IDisposable {
+            JobHandle Schedule();
+        }
+
         public delegate void ChangeEvent(InstanceArea instanceArea);
         public static event ChangeEvent ms_changeEvent;
-
 
         class InstanceAreaTransformDetailsProvider : ITransformDetailsProviding {
             List<InstanceArea> m_additiveAreas;
             List<InstanceArea> m_subtractiveAreas;
             float m_totalArea;
             long m_instanceCount;
-            int m_seed;
+            uint m_seed;
 
             public long DetailsCount => m_instanceCount;
 
-            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, int seed, int instancesPerUnit) {
+            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, uint seed, int instancesPerUnit) {
                 m_additiveAreas = new List<InstanceArea>();
                 m_subtractiveAreas = new List<InstanceArea>();
                 foreach (InstanceArea area in areas) {
@@ -38,63 +44,73 @@ namespace SKFX.WorldBuilder {
                 m_seed = seed;
             }
 
-            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
-                Random.State oldState = Random.state;
-                Random.InitState(m_seed);
 
-                for (int i = 0; i < m_instanceCount; ++i) {
-                    float random = Random.Range(0, m_totalArea);
 
-                    InstanceArea selectedArea = null;
-                    foreach (InstanceArea instanceArea in m_additiveAreas) {
-                        selectedArea = instanceArea;
-                        random -= instanceArea.Area;
-                        if (random <= 0) {
-                            break;
-                        }
-                    }
+            /*public struct MyJob : IJob {
+                [ReadOnly]
+                public InstanceArea instanceArea;
 
-                    Vector3 point;
-                    bool badPosition;
-                    do {
-                        point = selectedArea.RandomPointInArea();
+                public NativeArray<TransformDetails> result;
 
-                        badPosition = false;
-                        foreach (InstanceArea instanceArea in m_subtractiveAreas) {
-                            if (instanceArea.TestPointInAreaXZ(point)) {
-                                badPosition = true;
-                                break;
-                            }
-                        }
-                    } while (badPosition);
-
-                    ref TransformDetails details = ref transformDetailsOut[startIndex + i];
-                    details.position = point;
+                public void Execute() {
+                    TransformDetails details = new TransformDetails();
+                    details.position = instanceArea.RandomPointInArea();
                     details.rotation = Quaternion.identity;// LookRotation(selectedTriangle.forward, selectedTriangle.normal);
                     details.uniformScale = 1.0f;
+
+                    result[0] = details;
+                }
+            }*/
+
+
+
+
+
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
+                NativeArray<TransformDetails>[] results = new NativeArray<TransformDetails>[m_additiveAreas.Count];
+                IJobContainer[] jobs = new IJobContainer[m_additiveAreas.Count];
+                NativeArray<JobHandle> jobHandles = new NativeArray<JobHandle>(m_additiveAreas.Count, Allocator.Temp);
+
+                for (int i = 0; i < m_additiveAreas.Count; ++i) {
+                    InstanceArea instanceArea = m_additiveAreas[i];
+                    float areaFraction = instanceArea.Area / m_totalArea;
+                    long instances = Mathf.FloorToInt(m_instanceCount * areaFraction);
+                    results[i] = new NativeArray<TransformDetails>((int)instances, Allocator.TempJob);
+                    jobs[i] = instanceArea.ScheduleTransformDetailsGeneratorJob(results[i], instances, m_seed); // FIXME, rotate the seed?
+                    jobHandles[i] = jobs[i].Schedule();
                 }
 
-                Random.state = oldState;
+                JobHandle.CompleteAll(jobHandles);
 
-                if (snapLayerMask > 0) {
-                    for (int i = 0; i < m_instanceCount; ++i) {
-                        ref TransformDetails details = ref transformDetailsOut[startIndex + i];
+                long currentStartIndex = startIndex;
+                for (int i = 0; i < m_additiveAreas.Count; ++i) {
+                    jobs[i].Dispose();
 
-                        Vector3 normal = details.rotation * Vector3.up;
-                        RaycastHit hit;
+                    for (int j = 0; j < results[i].Length; ++j) {
+                        transformDetailsOut[currentStartIndex + j] = results[i][j];
 
-                        if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
-                            details.position = hit.point;
-                            details.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
+                        if (snapLayerMask > 0) {
+                            ref TransformDetails details = ref transformDetailsOut[currentStartIndex + j];
+
+                            Vector3 normal = details.rotation * Vector3.up;
+                            RaycastHit hit;
+
+                            if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
+                                details.position = hit.point;
+                                details.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
+                            }
                         }
                     }
+
+                    currentStartIndex += results[i].Length;
+                    results[i].Dispose();
                 }
 
-                return startIndex + m_instanceCount;
+                return currentStartIndex;
             }
         }
 
-        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, int seed, int instancesPerUnit) {
+        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, uint seed, int instancesPerUnit) {
             return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed, instancesPerUnit);
         }
 
@@ -117,6 +133,11 @@ namespace SKFX.WorldBuilder {
 
         protected abstract float Area { get; }
         protected abstract Vector3 RandomPointInArea();
+
+        protected abstract IJobContainer ScheduleTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed);
+        //protected abstract IJobContainer ScheduleTransformDetailsFilterJob(NativeArray<TransformDetails> details);
+
+
         //        protected abstract bool TestPointInArea(Vector3 point);
 
         public abstract bool TestPointInArea(Vector3 point);

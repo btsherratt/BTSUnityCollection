@@ -20,9 +20,9 @@ namespace SKFX.WorldBuilder {
             center /= m_points.Length;
 
             for (int i = 0; i < m_points.Length; ++i) {
-                Vector3 pointA = transform.TransformPoint(m_points[i]);
-                Vector3 pointB = transform.TransformPoint(m_points[(i + 1) % m_points.Length]);
-                Vector3 pointC = transform.TransformPoint(center);
+                Vector3 pointA = m_points[i];
+                Vector3 pointB = m_points[(i + 1) % m_points.Length];
+                Vector3 pointC = center;
                 triangles[i] = new Triangle(pointA, pointB, pointC);
             }
 
