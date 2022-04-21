@@ -97,19 +97,26 @@ namespace SKFX.WorldBuilder {
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
                 long startIdx = 0;
+                
+                while (startIdx < instanceCount) {
+                    for (int i = 0; i < triangles.Length; ++i) {
+                        Triangle triangle = triangles[i];
+                        float areaFraction = triangle.area / area;
+                        long instances = (long)(instanceCount * areaFraction);
+                        instances = Mathf.Min((int)instances, (int)(instanceCount - startIdx));
 
-                for (int i = 0; i < triangles.Length; ++i) {
-                    Triangle triangle = triangles[i];
-                    float areaFraction = triangle.area / area;
-                    long instances = (long)(instanceCount * areaFraction + 0.5f);
-                    instances = Mathf.Min((int)instances, (int)(instanceCount - startIdx));
-                    for (int j = 0; j < instances; ++j) {
-                        Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
-                        TransformDetails details = new TransformDetails();
-                        details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
-                        Output[(int)(startIdx + j)] = details;
+                        for (int j = 0; j < instances; ++j) {
+                            Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
+                            TransformDetails details = new TransformDetails();
+                            details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
+                            Output[(int)(startIdx + j)] = details;
+                        }
+                        startIdx += instances;
+
+                        if (startIdx == instanceCount) {
+                            break;
+                        }
                     }
-                    startIdx += instances;
                 }
             }
 
@@ -205,6 +212,8 @@ namespace SKFX.WorldBuilder {
             RegenerateTriangles();
 
             Debug.Assert(instanceCount < int.MaxValue);
+
+            Debug.Assert(m_cachedTriangles.Length > 0);
 
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
             job.randomSeed = randomSeed;

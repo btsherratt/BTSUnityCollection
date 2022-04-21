@@ -5,9 +5,9 @@ public class TriggerDelegate : MonoBehaviour {
     public delegate void TriggerExitDelegate(Collider trigger, Collider other);
     public delegate void TriggerStayDelegate(Collider trigger, Collider other);
 
-    public TriggerEnterDelegate m_triggerEnterDelegate;
-    public TriggerExitDelegate m_triggerExitDelegate;
-    public TriggerStayDelegate m_triggerStayDelegate;
+    public event TriggerEnterDelegate m_triggerEnterDelegate;
+    public event TriggerExitDelegate m_triggerExitDelegate;
+    public event TriggerStayDelegate m_triggerStayDelegate;
 
     public Collider m_collider { get; private set; }
 
