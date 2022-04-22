@@ -107,8 +107,12 @@ namespace SKFX.WorldBuilder {
 
                         for (int j = 0; j < instances; ++j) {
                             Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
+                            
                             TransformDetails details = new TransformDetails();
                             details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
+                            details.rotation = Quaternion.identity;
+                            details.uniformScale = 1.0f;
+
                             Output[(int)(startIdx + j)] = details;
                         }
                         startIdx += instances;

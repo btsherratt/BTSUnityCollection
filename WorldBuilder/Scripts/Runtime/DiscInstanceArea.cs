@@ -27,9 +27,13 @@ namespace SKFX.WorldBuilder {
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
                 for (int i = 0; i < Output.Length; ++i) {
-                    TransformDetails details = new TransformDetails();
                     Vector2 point = rnd.NextFloat2Direction() * rnd.NextFloat(radius);
+
+                    TransformDetails details = new TransformDetails();
                     details.position = matrix * new Vector4(point.x, 0, point.y, 1);
+                    details.rotation = Quaternion.identity;
+                    details.uniformScale = 1.0f;
+
                     Output[i] = details;
                 }
             }

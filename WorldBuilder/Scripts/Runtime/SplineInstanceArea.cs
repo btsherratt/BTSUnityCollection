@@ -28,8 +28,6 @@ namespace SKFX.WorldBuilder {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
 
                 for (int i = 0; i < Output.Length; ++i) {
-                    TransformDetails details = new TransformDetails();
-
                     Vector3 forward;
                     Vector3 point = spline.Lerp(out forward, rnd.NextFloat(0.0f, spline.Length), Spline.Units.World);
                     //point = transform.TransformPoint(point);
@@ -38,7 +36,11 @@ namespace SKFX.WorldBuilder {
                     point += Vector3.Cross(forward, Vector3.up) * rnd.NextFloat(-width / 2.0f, width / 2.0f);
                     point = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
 
+                    TransformDetails details = new TransformDetails();
                     details.position = point;
+                    details.rotation = Quaternion.identity;
+                    details.uniformScale = 1.0f;
+
                     Output[i] = details;
                 }
             }
