@@ -20,6 +20,9 @@ namespace SKFX.WorldBuilder {
 
             public AnimationCurve m_scaleCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
+            public float m_maxAngle = 45.0f;
+            public float m_groundAngleMultiplier = 1.0f;
+
             [Header("Advanced Settings")]
             public int m_instancesPerUnit = 10;
         }
@@ -27,12 +30,16 @@ namespace SKFX.WorldBuilder {
         public struct InstanceDetails : ITransformDetailsProviding {
             public InstancePrefabConfiguration prefabConfiguration;
             ITransformDetailsProviding transformDetailsProvider;
+            float groundAngleMultiplier;
+            float maxAngle;
             int snapLayerMask;
             int seed;
 
-            public InstanceDetails(InstancePrefabConfiguration prefabConfiguration, ITransformDetailsProviding transformDetailsProvider, int snapLayerMask, uint seed) {
+            public InstanceDetails(InstancePrefabConfiguration prefabConfiguration, ITransformDetailsProviding transformDetailsProvider, float groundAngleMultiplier, float maxAngle, int snapLayerMask, uint seed) {
                 this.prefabConfiguration = prefabConfiguration;
                 this.transformDetailsProvider = transformDetailsProvider;
+                this.groundAngleMultiplier = groundAngleMultiplier;
+                this.maxAngle = maxAngle;
                 this.snapLayerMask = snapLayerMask;
                 this.seed = (int)seed;
             }
@@ -40,22 +47,25 @@ namespace SKFX.WorldBuilder {
             public long DetailsCount => transformDetailsProvider.DetailsCount;
 
             public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex) {
-                return GenerateDetails(transformDetailsOut, startIndex, snapLayerMask);
+                return GenerateDetails(transformDetailsOut, startIndex, groundAngleMultiplier, maxAngle, snapLayerMask);
             }
 
-            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
-                long finalIndex = transformDetailsProvider.GenerateDetails(transformDetailsOut, startIndex, snapLayerMask);
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, float groundAngleMultiplier, float maxAngle, int snapLayerMask = 0) {
+                long finalIndex = transformDetailsProvider.GenerateDetails(transformDetailsOut, startIndex, groundAngleMultiplier, maxAngle, snapLayerMask);
 
                 var randomState = Random.state;
                 Random.InitState(seed);
 
                 for (long i = startIndex; i < finalIndex; ++i) {
                     ref TransformDetails transformDetails = ref transformDetailsOut[i];
-                    float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
-                    transformDetails.rotation = transformDetails.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
-                    transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
+
+                    //if () {
+                        float rotationX = prefabConfiguration.m_randomXRotation ? Random.Range(0.0f, 360.0f) : 0;
+                        float rotationY = prefabConfiguration.m_randomYRotation ? Random.Range(0.0f, 360.0f) : 0;
+                        float rotationZ = prefabConfiguration.m_randomZRotation ? Random.Range(0.0f, 360.0f) : 0;
+                        transformDetails.rotation = transformDetails.rotation * Quaternion.Euler(rotationX, rotationY, rotationZ); // fixme, seed
+                        transformDetails.uniformScale = Mathf.Lerp(prefabConfiguration.m_scale.x, prefabConfiguration.m_scale.y, prefabConfiguration.m_scaleCurve.Evaluate(Random.value));
+                    //}
                 }
 
                 Random.state = randomState;
@@ -67,6 +77,8 @@ namespace SKFX.WorldBuilder {
         public uint m_seed;
 
         public List<InstancePrefabConfiguration> m_prefabConfigurations;
+
+        public bool m_useSnapLayer = true;
 
         [Layer]
         public int m_snapLayer;
@@ -88,7 +100,8 @@ namespace SKFX.WorldBuilder {
             uint seed = m_seed;
             foreach (InstancePrefabConfiguration configuration in m_prefabConfigurations) {
                 ITransformDetailsProviding transformDetailsProvider = InstanceArea.TransformDetailsProvider(areas, configuration.m_density, seed, configuration.m_instancesPerUnit);
-                InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider, 1 << m_snapLayer, seed);
+                int snapLayerMask = m_useSnapLayer ? 1 << m_snapLayer : 0;
+                InstanceDetails details = new InstanceDetails(configuration, transformDetailsProvider, configuration.m_groundAngleMultiplier, configuration.m_maxAngle, snapLayerMask, seed);
                 yield return details;
                 ++seed;
             }

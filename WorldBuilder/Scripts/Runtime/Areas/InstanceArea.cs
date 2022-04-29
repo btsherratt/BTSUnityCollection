@@ -61,7 +61,7 @@ namespace SKFX.WorldBuilder {
                 m_seed = seed;
             }
 
-            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, int snapLayerMask = 0) {
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, float groundAngleMultiplier, float maxAngle, int snapLayerMask = 0) {
                 NativeArray<TransformDetails>[] additiveResults = new NativeArray<TransformDetails>[m_additiveAreas.Count];
                 IJobContainer[] additiveJobs = new IJobContainer[m_additiveAreas.Count];
                 NativeArray<JobHandle> additiveJobHandles = new NativeArray<JobHandle>(m_additiveAreas.Count, Allocator.Temp);
@@ -132,20 +132,29 @@ namespace SKFX.WorldBuilder {
 
                     if (pass) {
                         transformDetailsOut[currentOutIndex] = combinedResults[i];
+                        ref TransformDetails details = ref transformDetailsOut[currentOutIndex];
 
                         if (snapLayerMask > 0) {
-                            ref TransformDetails details = ref transformDetailsOut[currentOutIndex];
-
                             Vector3 normal = details.rotation * Vector3.up;
                             RaycastHit hit;
 
                             if (Physics.Raycast(details.position + Vector3.up * 3000, Vector3.down, out hit, float.MaxValue, snapLayerMask)) {
                                 details.position = hit.point;
                                 details.rotation = Quaternion.LookRotation(Vector3.Cross(Vector3.right, hit.normal), hit.normal);
+                            } else {
+                                pass = false;
                             }
                         }
 
-                        ++currentOutIndex;
+                        if (pass) {
+                            float angle = Vector3.Angle(details.rotation * Vector3.up, Vector3.up);
+                            pass = angle <= maxAngle;
+                        }
+
+                        if (pass) {
+                            details.rotation = Quaternion.SlerpUnclamped(Quaternion.identity, details.rotation, groundAngleMultiplier);
+                            ++currentOutIndex;
+                        }
                     }
                 }
 

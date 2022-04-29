@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
@@ -9,10 +10,10 @@ namespace SKFX.WorldBuilder {
         }
 
         void Setup() {
-            GenerateCollisionMesh();
+            StartCoroutine(GenerateCollisionMesh());
         }
 
-        void GenerateCollisionMesh() {
+        IEnumerator GenerateCollisionMesh() {
             Dictionary<GameObject, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<InstanceProvider.InstanceDetails>>();
 
             foreach (InstanceProvider instanceProvider in InstanceProvider.All()) {
@@ -102,7 +103,10 @@ namespace SKFX.WorldBuilder {
                         }
                     }
 
-
+                    // Pause a little for a break and some coffee.
+                    if (endIdx % 100 == 0) {
+                        yield return null;
+                    }
 
                     /*Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
 
@@ -120,7 +124,10 @@ namespace SKFX.WorldBuilder {
                         }
                     }*/
                 }
-                }
+
+                // Another little break...
+                yield return null;
+            }
 
             if (combineInstances.Count > 0) {
                 Mesh collisionMesh = new Mesh();

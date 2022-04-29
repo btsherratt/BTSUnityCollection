@@ -110,7 +110,7 @@ namespace SKFX.WorldBuilder {
                             
                             TransformDetails details = new TransformDetails();
                             details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
-                            details.rotation = Quaternion.identity;
+                            details.rotation = Quaternion.LookRotation(triangle.forward, triangle.normal);
                             details.uniformScale = 1.0f;
 
                             Output[(int)(startIdx + j)] = details;

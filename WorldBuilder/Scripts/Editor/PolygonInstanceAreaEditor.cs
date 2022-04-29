@@ -52,10 +52,12 @@ namespace SKFX.WorldBuilder {
             }
 
             Handles.color = Color.yellow;
-            foreach (Vector3 point in targetArea.m_points) {
-                Vector3 worldPoint = targetArea.transform.TransformPoint(point);
-                Handles.DrawLine(worldPoint + Vector3.forward, worldPoint + Vector3.back);
-                Handles.DrawLine(worldPoint + Vector3.left, worldPoint + Vector3.right);
+            if (targetArea.m_points != null) {
+                foreach (Vector3 point in targetArea.m_points) {
+                    Vector3 worldPoint = targetArea.transform.TransformPoint(point);
+                    Handles.DrawLine(worldPoint + Vector3.forward, worldPoint + Vector3.back);
+                    Handles.DrawLine(worldPoint + Vector3.left, worldPoint + Vector3.right);
+                }
             }
 
             if (m_editing) {
