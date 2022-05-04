@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 
 namespace SKFX.WorldBuilder {
-    public abstract class InstanceArea : MonoBehaviour {
+    public abstract class InstanceArea : TrackedMonoBehaviour<InstanceArea> {
         protected interface IJobContainer : IDisposable {
             JobHandle Schedule();
         }
@@ -39,18 +39,9 @@ namespace SKFX.WorldBuilder {
 
             public long DetailsCount => m_instanceCount;
 
-            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> areas, float density, uint seed, int instancesPerUnit) {
-                m_additiveAreas = new List<InstanceArea>();
-                m_subtractiveAreas = new List<InstanceArea>();
-                foreach (InstanceArea area in areas) {
-                    if (area.isActiveAndEnabled) {
-                        if (area.m_operation == Operation.Additive) {
-                            m_additiveAreas.Add(area);
-                        } else {
-                            m_subtractiveAreas.Add(area);
-                        }
-                    }
-                }
+            public InstanceAreaTransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, IEnumerable<InstanceArea> subtractiveAreas, float density, uint seed, int instancesPerUnit) {
+                m_additiveAreas = new List<InstanceArea>(additiveAreas);
+                m_subtractiveAreas = new List<InstanceArea>(subtractiveAreas);
 
                 m_totalArea = 0;
                 foreach (InstanceArea instanceArea in m_additiveAreas) {
@@ -61,9 +52,9 @@ namespace SKFX.WorldBuilder {
                 m_seed = seed;
             }
 
-            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, float groundAngleMultiplier, float maxAngle, int snapLayerMask = 0) {
-                NativeArray<TransformDetails>[] additiveResults = new NativeArray<TransformDetails>[m_additiveAreas.Count];
-                IJobContainer[] additiveJobs = new IJobContainer[m_additiveAreas.Count];
+            public long GenerateDetails(TransformDetails[] transformDetailsOut, long startIndex, float objectRadius, float groundAngleMultiplier, float maxAngle, int snapLayerMask = 0) {
+                List<NativeArray<ObjectDetails>> additiveResults = new List<NativeArray<ObjectDetails>>();
+                List<IJobContainer> additiveJobs = new List<IJobContainer>();
                 NativeArray<JobHandle> additiveJobHandles = new NativeArray<JobHandle>(m_additiveAreas.Count, Allocator.Temp);
 
                 long totalNumInstances = 0;
@@ -72,8 +63,8 @@ namespace SKFX.WorldBuilder {
                     float areaFraction = instanceArea.Area / m_totalArea;
                     long instances = Mathf.FloorToInt(m_instanceCount * areaFraction);
                     if (instances > 0 && instances < int.MaxValue) {
-                        additiveResults[i] = new NativeArray<TransformDetails>((int)instances, Allocator.TempJob);
-                        additiveJobs[i] = instanceArea.CreateTransformDetailsGeneratorJob(additiveResults[i], instances, m_seed); // FIXME, rotate the seed?
+                        additiveResults.Add(new NativeArray<ObjectDetails>((int)instances, Allocator.TempJob));
+                        additiveJobs.Add(instanceArea.CreateTransformDetailsGeneratorJob(additiveResults[i], instances, objectRadius, m_seed)); // FIXME, rotate the seed?
                         additiveJobHandles[i] = additiveJobs[i].Schedule();
                     } else if (instances > 0) {
                         Debug.LogError("Instance is exceeding the max instance count... :(");
@@ -93,14 +84,15 @@ namespace SKFX.WorldBuilder {
                 JobHandle.CompleteAll(additiveJobHandles);
                 additiveJobHandles.Dispose();
 
-                NativeArray<TransformDetails> combinedResults = new NativeArray<TransformDetails>((int)totalNumInstances, Allocator.TempJob);
+                NativeArray<ObjectDetails> combinedResults = new NativeArray<ObjectDetails>((int)totalNumInstances, Allocator.TempJob);
 
                 int currentIdx = 0;
-                for (int i = 0; i < m_additiveAreas.Count; ++i) {
+                for (int i = 0; i < additiveResults.Count; ++i) {
                     if (additiveResults[i] != null) {
                         for (int j = 0; j < additiveResults[i].Length; ++j) {
                             combinedResults[currentIdx++] = additiveResults[i][j];
                         }
+
                         additiveJobs[i].Dispose();
                         additiveResults[i].Dispose();
                     }
@@ -131,7 +123,7 @@ namespace SKFX.WorldBuilder {
                     }
 
                     if (pass) {
-                        transformDetailsOut[currentOutIndex] = combinedResults[i];
+                        transformDetailsOut[currentOutIndex] = combinedResults[i].transformDetails;
                         ref TransformDetails details = ref transformDetailsOut[currentOutIndex];
 
                         if (snapLayerMask > 0) {
@@ -169,13 +161,14 @@ namespace SKFX.WorldBuilder {
             }
         }
 
-        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, float density, uint seed, int instancesPerUnit) {
-            return new InstanceAreaTransformDetailsProvider(additiveAreas, density, seed, instancesPerUnit);
+        public static ITransformDetailsProviding TransformDetailsProvider(IEnumerable<InstanceArea> additiveAreas, IEnumerable<InstanceArea> subtractiveAreas, float density, uint seed, int instancesPerUnit) {
+            return new InstanceAreaTransformDetailsProvider(additiveAreas, subtractiveAreas, density, seed, instancesPerUnit);
         }
 
         public enum Operation {
             Additive,
-            Subtractive
+            Subtractive,
+            Cutout,
         }
 
         public Operation m_operation;
@@ -193,8 +186,8 @@ namespace SKFX.WorldBuilder {
         protected abstract float Area { get; }
         protected abstract Vector3 RandomPointInArea();
 
-        protected abstract IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed);
-        protected abstract IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap);
+        protected abstract IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<ObjectDetails> details, long instanceCount, float objectRadius, uint randomSeed);
+        protected abstract IJobContainer CreateTransformDetailsFilterJob(NativeArray<ObjectDetails> details, NativeArray<bool> overlap);
 
 
         //        protected abstract bool TestPointInArea(Vector3 point);

@@ -19,10 +19,13 @@ namespace SKFX.WorldBuilder {
             public Matrix4x4 matrix;
 
             [ReadOnly]
+            public float objectRadius;
+
+            [ReadOnly]
             public uint randomSeed;
 
             [WriteOnly]
-            public NativeArray<TransformDetails> Output;
+            public NativeArray<ObjectDetails> Output;
 
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
@@ -36,10 +39,11 @@ namespace SKFX.WorldBuilder {
                     point += Vector3.Cross(forward, Vector3.up) * rnd.NextFloat(-width / 2.0f, width / 2.0f);
                     point = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
 
-                    TransformDetails details = new TransformDetails();
-                    details.position = point;
-                    details.rotation = Quaternion.identity;
-                    details.uniformScale = 1.0f;
+                    ObjectDetails details = new ObjectDetails();
+                    details.transformDetails.position = point;
+                    details.transformDetails.rotation = Quaternion.identity;
+                    details.transformDetails.uniformScale = 1.0f;
+                    details.radius = objectRadius;
 
                     Output[i] = details;
                 }
@@ -58,19 +62,19 @@ namespace SKFX.WorldBuilder {
             [ReadOnly]
             public float width;
 
-            [ReadOnly]
+            //[ReadOnly]
             public Matrix4x4 matrix;
 
             [ReadOnly]
-            public NativeArray<TransformDetails> Input;
+            public NativeArray<ObjectDetails> Input;
 
             [WriteOnly]
             public NativeArray<bool> Output;
 
             public void Execute() {
                 for (int i = 0; i < Output.Length; ++i) {
-                    Vector3 point = matrix * Input[i].position;
-                    bool test = spline.TestDistanceToSpline(point, width, new Vector3(1, 0, 1));
+                    Vector3 point = matrix * Input[i].transformDetails.position;
+                    bool test = spline.TestDistanceToSpline(point, width / 2.0f + Input[i].radius, new Vector3(1, 0, 1));
                     Output[i] = test;
                 }
             }
@@ -134,8 +138,9 @@ namespace SKFX.WorldBuilder {
 
 
 
-        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<ObjectDetails> details, long instanceCount, float objectRadius, uint randomSeed) {
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
+            job.objectRadius = objectRadius;
             job.randomSeed = randomSeed;
             job.spline = m_spline.GetSplineImpl(Allocator.TempJob);
             job.width = m_width;
@@ -153,11 +158,11 @@ namespace SKFX.WorldBuilder {
 
 
 
-        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<ObjectDetails> details, NativeArray<bool> overlap) {
             TransformDetailsFilterJob job = new TransformDetailsFilterJob();
             job.spline = m_spline.GetSplineImpl(Allocator.TempJob);
             job.width = m_width;
-            job.matrix = transform.localToWorldMatrix;
+            job.matrix = transform.worldToLocalMatrix;
             job.Input = details;
             job.Output = overlap;
 

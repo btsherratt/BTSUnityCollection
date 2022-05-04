@@ -77,6 +77,9 @@ namespace SKFX.WorldBuilder {
         [BurstCompile(CompileSynchronously = true)]
         struct TransformDetailsGeneratorJob : IJob, IDisposable {
             [ReadOnly]
+            public float objectRadius;
+
+            [ReadOnly]
             public uint randomSeed;
 
             [ReadOnly]
@@ -92,7 +95,7 @@ namespace SKFX.WorldBuilder {
             public Matrix4x4 matrix;
 
             [WriteOnly]
-            public NativeArray<TransformDetails> Output;
+            public NativeArray<ObjectDetails> Output;
 
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
@@ -108,10 +111,11 @@ namespace SKFX.WorldBuilder {
                         for (int j = 0; j < instances; ++j) {
                             Vector3 point = triangle.RandomPoint(rnd.NextFloat(), rnd.NextFloat());
                             
-                            TransformDetails details = new TransformDetails();
-                            details.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
-                            details.rotation = Quaternion.LookRotation(triangle.forward, triangle.normal);
-                            details.uniformScale = 1.0f;
+                            ObjectDetails details = new ObjectDetails();
+                            details.transformDetails.position = matrix * new Vector4(point.x, point.y, point.z, 1.0f);
+                            details.transformDetails.rotation = Quaternion.LookRotation(triangle.forward, triangle.normal);
+                            details.transformDetails.uniformScale = 1.0f;
+                            details.radius = objectRadius;
 
                             Output[(int)(startIdx + j)] = details;
                         }
@@ -142,14 +146,14 @@ namespace SKFX.WorldBuilder {
             public Matrix4x4 matrix;
 
             [ReadOnly]
-            public NativeArray<TransformDetails> Input;
+            public NativeArray<ObjectDetails> Input;
 
             [WriteOnly]
             public NativeArray<bool> Output;
 
             public void Execute() {
                 for (int i = 0; i < Output.Length; ++i) {
-                    Vector3 point = matrix * Input[i].position;
+                    Vector3 point = matrix * Input[i].transformDetails.position;
 
                     bool test = false;
 
@@ -212,7 +216,7 @@ namespace SKFX.WorldBuilder {
 
         protected abstract Triangle[] GenerateTriangles();
 
-        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<ObjectDetails> details, long instanceCount, float objectRadius, uint randomSeed) {
             RegenerateTriangles();
 
             Debug.Assert(instanceCount < int.MaxValue);
@@ -220,6 +224,7 @@ namespace SKFX.WorldBuilder {
             Debug.Assert(m_cachedTriangles.Length > 0);
 
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
+            job.objectRadius = objectRadius;
             job.randomSeed = randomSeed;
             job.instanceCount = instanceCount;
             job.triangles = new NativeArray<Triangle>(m_cachedTriangles, Allocator.TempJob);
@@ -245,7 +250,7 @@ namespace SKFX.WorldBuilder {
 
 
 
-        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<ObjectDetails> details, NativeArray<bool> overlap) {
             TransformDetailsFilterJob job = new TransformDetailsFilterJob();
             job.triangles = new NativeArray<Triangle>(m_cachedTriangles, Allocator.TempJob);
             job.bounds = m_cachedBounds;

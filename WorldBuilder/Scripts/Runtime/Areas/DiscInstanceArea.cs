@@ -10,6 +10,9 @@ namespace SKFX.WorldBuilder {
         [BurstCompile(CompileSynchronously = true)]
         struct TransformDetailsGeneratorJob : IJob, IDisposable {
             [ReadOnly]
+            public float objectRadius;
+
+            [ReadOnly]
             public uint randomSeed;
 
             [ReadOnly]
@@ -22,17 +25,18 @@ namespace SKFX.WorldBuilder {
             public Matrix4x4 matrix;
 
             [WriteOnly]
-            public NativeArray<TransformDetails> Output;
+            public NativeArray<ObjectDetails> Output;
 
             public void Execute() {
                 Unity.Mathematics.Random rnd = new Unity.Mathematics.Random(randomSeed);
                 for (int i = 0; i < Output.Length; ++i) {
                     Vector2 point = rnd.NextFloat2Direction() * rnd.NextFloat(radius);
 
-                    TransformDetails details = new TransformDetails();
-                    details.position = matrix * new Vector4(point.x, 0, point.y, 1);
-                    details.rotation = Quaternion.identity;
-                    details.uniformScale = 1.0f;
+                    ObjectDetails details = new ObjectDetails();
+                    details.transformDetails.position = matrix * new Vector4(point.x, 0, point.y, 1);
+                    details.transformDetails.rotation = Quaternion.identity;
+                    details.transformDetails.uniformScale = 1.0f;
+                    details.radius = objectRadius;
 
                     Output[i] = details;
                 }
@@ -55,15 +59,16 @@ namespace SKFX.WorldBuilder {
             public Matrix4x4 matrix;
 
             [ReadOnly]
-            public NativeArray<TransformDetails> Input;
+            public NativeArray<ObjectDetails> Input;
 
             [WriteOnly]
             public NativeArray<bool> Output;
 
             public void Execute() {
                 for (int i = 0; i < Output.Length; ++i) {
-                    Vector3 point = matrix * Input[i].position;
-                    Vector3 delta = point - center;
+                    Vector3 position = Input[i].transformDetails.position;
+                    Vector3 point = matrix * new Vector4(position.x, position.y, position.z, 1.0f);
+                    Vector3 delta = point.XZ() - center.XZ();
                     bool test = delta.sqrMagnitude <= radius * radius;
                     Output[i] = test;
                 }
@@ -79,8 +84,9 @@ namespace SKFX.WorldBuilder {
 
         protected override float Area => Mathf.PI * m_radius * m_radius;
 
-        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<TransformDetails> details, long instanceCount, uint randomSeed) {
+        protected override IJobContainer CreateTransformDetailsGeneratorJob(NativeArray<ObjectDetails> details, long instanceCount, float objectRadius, uint randomSeed) {
             TransformDetailsGeneratorJob job = new TransformDetailsGeneratorJob();
+            job.objectRadius = objectRadius;
             job.randomSeed = randomSeed;
             job.center = m_center;
             job.radius = m_radius;
@@ -90,11 +96,12 @@ namespace SKFX.WorldBuilder {
             return new JobContainer<TransformDetailsGeneratorJob>(job);
         }
 
-        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<TransformDetails> details, NativeArray<bool> overlap) {
+        protected override IJobContainer CreateTransformDetailsFilterJob(NativeArray<ObjectDetails> details, NativeArray<bool> overlap) {
             TransformDetailsFilterJob job = new TransformDetailsFilterJob();
             job.center = m_center;
             job.radius = m_radius;
-            job.matrix = transform.localToWorldMatrix;
+            job.matrix = transform.worldToLocalMatrix;
+            Debug.Log(job.matrix);
             job.Input = details;
             job.Output = overlap;
 

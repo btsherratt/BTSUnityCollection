@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace SKFX.WorldBuilder {
     public class InstanceCollisionBuilder : MonoBehaviour {
+#if false
         void Start() {
             Setup();
         }
@@ -14,15 +15,15 @@ namespace SKFX.WorldBuilder {
         }
 
         IEnumerator GenerateCollisionMesh() {
-            Dictionary<GameObject, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<InstanceProvider.InstanceDetails>>();
+            Dictionary<GameObject, List<OldInstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<OldInstanceProvider.InstanceDetails>>();
 
-            foreach (InstanceProvider instanceProvider in InstanceProvider.All()) {
-                foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
+            foreach (OldInstanceProvider instanceProvider in OldInstanceProvider.All()) {
+                foreach (OldInstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
                     Collider prefabCollider = details.prefabConfiguration.m_prefab.GetComponentInChildren<Collider>();
                     if (prefabCollider != null) {
-                        List<InstanceProvider.InstanceDetails> instanceDetails;
+                        List<OldInstanceProvider.InstanceDetails> instanceDetails;
                         if (instanceDetailsByPrefab.TryGetValue(details.prefabConfiguration.m_prefab, out instanceDetails) == false) {
-                            instanceDetails = new List<InstanceProvider.InstanceDetails>();
+                            instanceDetails = new List<OldInstanceProvider.InstanceDetails>();
                             instanceDetailsByPrefab[details.prefabConfiguration.m_prefab] = instanceDetails;
                         }
                         instanceDetails.Add(details);
@@ -37,8 +38,8 @@ namespace SKFX.WorldBuilder {
             long maxTransformDetails = 0;
             foreach (var pair in instanceDetailsByPrefab) {
                 long transformDetailsCount = 0;
-                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
-                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                List<OldInstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+                foreach (OldInstanceProvider.InstanceDetails details in instanceDetails) {
                     transformDetailsCount += details.DetailsCount;
                 }
                 if (transformDetailsCount > maxTransformDetails) {
@@ -49,12 +50,12 @@ namespace SKFX.WorldBuilder {
             TransformDetails[] allTransformDetails = new TransformDetails[maxTransformDetails];
             foreach (var pair in instanceDetailsByPrefab) {
                 GameObject prefab = pair.Key;
-                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+                List<OldInstanceProvider.InstanceDetails> instanceDetails = pair.Value;
 
                 Collider[] prefabColliders = prefab.GetComponentsInChildren<Collider>();
 
                 long endIdx = 0;
-                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
+                foreach (OldInstanceProvider.InstanceDetails details in instanceDetails) {
                     endIdx = details.GenerateDetails(allTransformDetails, endIdx);
                 }
 
@@ -139,5 +140,6 @@ namespace SKFX.WorldBuilder {
             }
 
         }
+#endif
     }
 }

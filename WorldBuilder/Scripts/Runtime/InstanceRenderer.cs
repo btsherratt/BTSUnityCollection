@@ -23,10 +23,10 @@ namespace SKFX.WorldBuilder {
         struct DrawData {
             public DrawPair[] drawPairs;
 
-            public ComputeBuffer unculledDataBuffer;
+            public SafeDisposable<ComputeBuffer> unculledDataBuffer;
 
-            public ComputeBuffer indirectArguments;
-            public ComputeBuffer matrixBuffer;
+            public SafeDisposable<ComputeBuffer> indirectArguments;
+            public SafeDisposable<ComputeBuffer> matrixBuffer;
         }
 
         /*[StructLayout(LayoutKind.Explicit, Pack = 1, Size = InstanceDetails.Size)]
@@ -64,29 +64,30 @@ namespace SKFX.WorldBuilder {
             Cleanup();
         }
 
-        void OnAnyInstanceProviderChanged(InstanceProvider instanceProvider) {
+        /*void OnAnyInstanceProviderChanged(OldInstanceProvider instanceProvider) {
             Cleanup();
         }
 
         void OnAnyInstanceAreaChanged(InstanceArea instanceArea) {
             Cleanup();
-        }
+        }*/
 
         void OnEnable() {
-            InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
+            /*InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
             InstanceArea.ms_changeEvent += OnAnyInstanceAreaChanged;
 
-            InstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
-            InstanceProvider.ms_changeEvent += OnAnyInstanceProviderChanged;
+            OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
+            OldInstanceProvider.ms_changeEvent += OnAnyInstanceProviderChanged;*/
 
             Camera.onPreCull -= TryDraw;
             Camera.onPreCull += TryDraw;
         }
 
         void OnDisable() {
-            InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
-            InstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
+            //InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
+            //OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
             Camera.onPreCull -= TryDraw;
+            Cleanup();
         }
 
         void TryDraw(Camera camera) {
@@ -130,7 +131,8 @@ namespace SKFX.WorldBuilder {
 
             Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefabLOD = new Dictionary<LODGroup, List<InstanceProvider.InstanceDetails>>();
 
-            foreach (InstanceProvider instanceProvider in InstanceProvider.All()) {
+            InstanceProvider instanceProvider = GetComponent<InstanceProvider>();
+//            foreach (OldInstanceProvider instanceProvider in OldInstanceProvider.All()) {
                 foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
                     LODGroup prefabLODGroup = details.prefabConfiguration.m_prefab.GetComponent<LODGroup>();
                     if (prefabLODGroup != null) {
@@ -142,7 +144,7 @@ namespace SKFX.WorldBuilder {
                         instanceDetails.Add(details);
                     }
                 }
-            }
+ //           }
 
             long totalInstances = 0;
             foreach (var pair in instanceDetailsByPrefabLOD) {
@@ -218,24 +220,26 @@ namespace SKFX.WorldBuilder {
                         Debug.LogError("Too many values!!!");
                     }
 
-                    drawData.unculledDataBuffer = new ComputeBuffer((int)startIdx, TransformDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
-                    drawData.unculledDataBuffer.SetData(allInstanceDetails, 0, 0, drawData.unculledDataBuffer.count);
+                    if (startIdx > 0) {
+                        drawData.unculledDataBuffer = new ComputeBuffer((int)startIdx, TransformDetails.Size, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
+                        drawData.unculledDataBuffer.Value.SetData(allInstanceDetails, 0, 0, drawData.unculledDataBuffer.Value.count);
 
-                    uint[] args = new uint[drawPairs.Count * 5];
-                    for (int i = 0; i < drawPairs.Count; ++i) {
-                        int baseIdx = i * 5;
-                        args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
-                        args[baseIdx + 1] = (uint)0;
-                        args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
-                        args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
+                        uint[] args = new uint[drawPairs.Count * 5];
+                        for (int i = 0; i < drawPairs.Count; ++i) {
+                            int baseIdx = i * 5;
+                            args[baseIdx + 0] = (uint)drawPairs[i].mesh.GetIndexCount(drawPairs[i].submeshIndex);
+                            args[baseIdx + 1] = (uint)0;
+                            args[baseIdx + 2] = (uint)drawPairs[i].mesh.GetIndexStart(drawPairs[i].submeshIndex);
+                            args[baseIdx + 3] = (uint)drawPairs[i].mesh.GetBaseVertex(drawPairs[i].submeshIndex);
+                        }
+
+                        drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
+                        drawData.indirectArguments.Value.SetData(args);
+
+                        drawData.matrixBuffer = new ComputeBuffer((int)startIdx, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
+
+                        m_drawData.Add(drawData);
                     }
-
-                    drawData.indirectArguments = new ComputeBuffer(drawPairs.Count, 5 * sizeof(uint), ComputeBufferType.IndirectArguments);
-                    drawData.indirectArguments.SetData(args);
-
-                    drawData.matrixBuffer = new ComputeBuffer((int)startIdx, 4 * 4 * sizeof(float), ComputeBufferType.Structured | ComputeBufferType.Append);
-
-                    m_drawData.Add(drawData);
                 }
             }
 
@@ -274,7 +278,7 @@ namespace SKFX.WorldBuilder {
                     m_commandBuffer.SetComputeMatrixParam(m_computeShader, "_MeshOffsetMatrix", drawPair.matrix);
 
                     m_commandBuffer.SetBufferCounterValue(drawData.matrixBuffer, 0);
-                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
+                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.Value.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
 
                     m_commandBuffer.SetGlobalMatrix("_MeshOffsetMatrix", drawPair.matrix);
 
@@ -292,10 +296,13 @@ namespace SKFX.WorldBuilder {
                     if (camera != null)
                         camera.RemoveCommandBuffer(CameraEvent.AfterForwardOpaque, m_commandBuffer);
                 }
-                m_cameras.Clear();
 
                 m_commandBuffer.Release();
                 m_commandBuffer = null;
+            }
+
+            if (m_cameras != null) {
+                m_cameras.Clear();
             }
         }
     }
