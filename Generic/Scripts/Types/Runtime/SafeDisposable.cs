@@ -39,6 +39,10 @@ public class SafeDisposable<T> : System.IDisposable where T : System.IDisposable
 #endif
     }
 
+    ~SafeDisposable() {
+        Dispose();
+    }
+
 #if UNITY_EDITOR
     private void DisposeOnStateChange(PlayModeStateChange state) {
         switch (state) { 

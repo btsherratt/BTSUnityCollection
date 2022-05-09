@@ -101,7 +101,6 @@ namespace SKFX.WorldBuilder {
             job.center = m_center;
             job.radius = m_radius;
             job.matrix = transform.worldToLocalMatrix;
-            Debug.Log(job.matrix);
             job.Input = details;
             job.Output = overlap;
 

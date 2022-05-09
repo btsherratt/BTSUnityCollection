@@ -20,4 +20,35 @@ public static class CoWait {
             yield return null;
         }
     }
+
+    public static IEnumerator Combine(IEnumerator first, IEnumerator second) {
+        Stack<IEnumerator> firstEnumerators = new Stack<IEnumerator>();
+        firstEnumerators.Push(first);
+
+        Stack<IEnumerator> secondEnumerators = new Stack<IEnumerator>();
+        secondEnumerators.Push(second);
+
+        bool a, b;
+        do {
+            a = ProcessEnumerators(firstEnumerators);
+            b = ProcessEnumerators(secondEnumerators);
+            yield return null;
+        } while (a || b);
+    }
+
+    static bool ProcessEnumerators(Stack<IEnumerator> enumerators) {
+        if (enumerators.Count > 0) {
+            IEnumerator enumerator = enumerators.Peek();
+            if (enumerator.MoveNext()) {
+                IEnumerator nestedEnumerator = enumerator.Current as IEnumerator;
+                if (nestedEnumerator != null) {
+                    enumerators.Push(nestedEnumerator);
+                }
+            } else {
+                enumerators.Pop();
+            }
+        }
+
+        return enumerators.Count > 0;
+    }
 }
