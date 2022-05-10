@@ -13,6 +13,9 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
 
     public bool m_invertedXControls = true;
 
+    [Layer]
+    public int m_physicsLayer;
+
     float m_angle = 0;
 
     PlayerInput m_playerInput;
@@ -44,9 +47,15 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
             //m_angle = Mathf.MoveTowardsAngle(m_angle, m_followTarget.transform.eulerAngles.y + 180, m_autoAnglePerSecond * Time.deltaTime);
         }
 
-        m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
+        Vector3 position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
 
+        float distance = Mathf.Abs(m_followTarget.localPosition.y);
 
-        //
+        RaycastHit raycastHit;
+        if (Physics.Raycast(position + Vector3.up * 100, Vector3.down, out raycastHit, distance + 100, 1 << m_physicsLayer)) {
+            position = raycastHit.point + Vector3.up * distance;
+        }
+
+        m_position = position;
     }
 }

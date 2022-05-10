@@ -3,5 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public interface ISaveGameDataProviding {
+    string SaveGameIdentifier { get; }
 
+    void SaveGameApplySaveData(ISaveGameDataReading data);
+    void SaveGameGatherSaveData(ISaveGameDataWriting data);
 }
