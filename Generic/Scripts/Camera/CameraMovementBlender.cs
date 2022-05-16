@@ -36,7 +36,7 @@ public class CameraMovementBlender : MonoBehaviour {
         position /= m_cameraPositionProviders.Length;
         target /= m_cameraPositionProviders.Length;
 
-        m_cameraTransform.position = position;
-        m_cameraTransform.LookAt(target);
+        m_cameraTransform.position = Vector3.MoveTowards(m_cameraTransform.position, position, 10.0f*Time.deltaTime);
+        m_cameraTransform.rotation = Quaternion.RotateTowards(m_cameraTransform.rotation, Quaternion.LookRotation(target - m_cameraTransform.position, Vector3.up), 100.0f * Time.deltaTime);
     }
 }
