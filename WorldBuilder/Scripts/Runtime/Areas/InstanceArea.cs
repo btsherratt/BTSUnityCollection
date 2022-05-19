@@ -63,9 +63,11 @@ namespace SKFX.WorldBuilder {
                     float areaFraction = instanceArea.Area / m_totalArea;
                     long instances = Mathf.FloorToInt(m_instanceCount * areaFraction);
                     if (instances > 0 && instances < int.MaxValue) {
-                        additiveResults.Add(new NativeArray<ObjectDetails>((int)instances, Allocator.TempJob));
-                        additiveJobs.Add(instanceArea.CreateTransformDetailsGeneratorJob(additiveResults[i], instances, objectRadius, m_seed)); // FIXME, rotate the seed?
-                        additiveJobHandles[i] = additiveJobs[i].Schedule();
+                        NativeArray<ObjectDetails> objectDetails = new NativeArray<ObjectDetails>((int)instances, Allocator.TempJob);
+                        additiveResults.Add(objectDetails);
+                        IJobContainer job = instanceArea.CreateTransformDetailsGeneratorJob(objectDetails, instances, objectRadius, m_seed); // FIXME, rotate the seed?
+                        additiveJobs.Add(job);
+                        additiveJobHandles[i] = job.Schedule();
                     } else if (instances > 0) {
                         Debug.LogError("Instance is exceeding the max instance count... :(");
                     }

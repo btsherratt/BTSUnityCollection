@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
+public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, CameraController.IPositionSource, CameraController.IRotationSource {
     public Transform m_followTarget;
     public Transform m_lookTarget;
 
@@ -22,9 +22,15 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
     InputAction m_lookAction;
 
     Vector3 m_position;
-    Vector3 ICameraPositionProviding.CameraPosition => m_position;
+    
+    public Vector3 GetCameraPosition(Camera camera) {
+        return m_position;
+    }
 
-    Vector3 ICameraPositionProviding.CameraLookTarget => m_lookTarget.position;
+    public Quaternion GetCameraRotation(Camera camera) {
+        return Quaternion.LookRotation(m_lookTarget.position - m_position, Vector3.up);
+        throw new System.NotImplementedException();
+    }
 
     private void OnEnable() {
         if (m_followTarget == null) {
@@ -37,9 +43,11 @@ public class OrbitCamera : MonoBehaviour, ICameraPositionProviding {
         m_lookAction = m_playerInput.actions.FindAction("Look");
 
         m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
+
+        Camera.main.GetComponent<CameraController>().PushControlSource(this);
     }
 
-    void ICameraPositionProviding.UpdateCameraValues() {
+    public void UpdateForCamera(Camera camera) {
         Vector2 lookDelta = m_lookAction.ReadValue<Vector2>();
         if (Mathf.Abs(lookDelta.x) >= float.Epsilon) {
             m_angle += (m_invertedXControls ? -lookDelta.x : lookDelta.x) * m_anglePerSecond * Time.deltaTime;
