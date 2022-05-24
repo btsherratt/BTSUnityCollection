@@ -16,6 +16,8 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
     [Layer]
     public int m_physicsLayer;
 
+    public CameraController m_cameraController;
+
     float m_angle = 0;
 
     PlayerInput m_playerInput;
@@ -44,7 +46,11 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
 
         m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
 
-        Camera.main.GetComponent<CameraController>().PushControlSource(this);
+        if (m_cameraController == null) {
+            m_cameraController = Camera.main.GetComponent<CameraController>();
+        }
+
+        m_cameraController.PushControlSource(this);
     }
 
     public void UpdateForCamera(Camera camera) {

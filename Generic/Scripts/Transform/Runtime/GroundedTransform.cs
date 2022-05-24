@@ -13,6 +13,8 @@ public class GroundedTransform : MonoBehaviour {
     public bool m_setYRotation = false;
     public bool m_setZRotation = false;
 
+
+
     private void Update() {
         if (transform.hasChanged) {
             RaycastHit hit;
@@ -34,6 +36,7 @@ public class GroundedTransform : MonoBehaviour {
                     transform.rotation = Quaternion.Euler(newAngles);
                 }
             }
+            transform.hasChanged = false;
         }
     }
 }
