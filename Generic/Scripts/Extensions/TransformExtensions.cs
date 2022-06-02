@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public static class TransformExtensions {
@@ -14,5 +15,16 @@ public static class TransformExtensions {
         float y = transform.position.y;
         Vector3 position = matchTransform.position;
         transform.position = new Vector3(position.x, y, position.z);
+    }
+
+    public static IEnumerable<Transform> FindAll(this Transform transform, string name) {
+        foreach (Transform childTransform in transform) {
+            if (childTransform.name == name) {
+                yield return childTransform;
+            }
+            foreach (Transform foundTransform in childTransform.FindAll(name)) { // FIXME, recursion isn't great
+                yield return foundTransform;
+            }
+        }
     }
 }
