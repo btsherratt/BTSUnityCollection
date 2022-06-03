@@ -5,29 +5,28 @@ using UnityEngine;
 
 namespace SKFX.WorldBuilder {
     public class InstanceCollisionBuilder : MonoBehaviour {
-#if false
         void Start() {
             Setup();
         }
 
         void Setup() {
-            StartCoroutine(GenerateCollisionMesh());
+            GenerateCollisionMesh();
+            //StartCoroutine(GenerateCollisionMesh());
         }
 
-        IEnumerator GenerateCollisionMesh() {
-            Dictionary<GameObject, List<OldInstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<OldInstanceProvider.InstanceDetails>>();
+        void GenerateCollisionMesh() {
+            Dictionary<GameObject, List<InstanceProvider.InstanceDetails>> instanceDetailsByPrefab = new Dictionary<GameObject, List<InstanceProvider.InstanceDetails>>();
 
-            foreach (OldInstanceProvider instanceProvider in OldInstanceProvider.All()) {
-                foreach (OldInstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
-                    Collider prefabCollider = details.prefabConfiguration.m_prefab.GetComponentInChildren<Collider>();
-                    if (prefabCollider != null) {
-                        List<OldInstanceProvider.InstanceDetails> instanceDetails;
-                        if (instanceDetailsByPrefab.TryGetValue(details.prefabConfiguration.m_prefab, out instanceDetails) == false) {
-                            instanceDetails = new List<OldInstanceProvider.InstanceDetails>();
-                            instanceDetailsByPrefab[details.prefabConfiguration.m_prefab] = instanceDetails;
-                        }
-                        instanceDetails.Add(details);
+            InstanceProvider instanceProvider = GetComponent<InstanceProvider>();
+            foreach (InstanceProvider.InstanceDetails details in instanceProvider.GenerateInstanceDetails()) {
+                Collider prefabCollider = details.prefabConfiguration.m_prefab.GetComponentInChildren<Collider>();
+                if (prefabCollider != null) {
+                    List<InstanceProvider.InstanceDetails> instanceDetails;
+                    if (instanceDetailsByPrefab.TryGetValue(details.prefabConfiguration.m_prefab, out instanceDetails) == false) {
+                        instanceDetails = new List<InstanceProvider.InstanceDetails>();
+                        instanceDetailsByPrefab[details.prefabConfiguration.m_prefab] = instanceDetails;
                     }
+                    instanceDetails.Add(details);
                 }
             }
 
@@ -38,8 +37,8 @@ namespace SKFX.WorldBuilder {
             long maxTransformDetails = 0;
             foreach (var pair in instanceDetailsByPrefab) {
                 long transformDetailsCount = 0;
-                List<OldInstanceProvider.InstanceDetails> instanceDetails = pair.Value;
-                foreach (OldInstanceProvider.InstanceDetails details in instanceDetails) {
+                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
                     transformDetailsCount += details.DetailsCount;
                 }
                 if (transformDetailsCount > maxTransformDetails) {
@@ -50,12 +49,12 @@ namespace SKFX.WorldBuilder {
             TransformDetails[] allTransformDetails = new TransformDetails[maxTransformDetails];
             foreach (var pair in instanceDetailsByPrefab) {
                 GameObject prefab = pair.Key;
-                List<OldInstanceProvider.InstanceDetails> instanceDetails = pair.Value;
+                List<InstanceProvider.InstanceDetails> instanceDetails = pair.Value;
 
                 Collider[] prefabColliders = prefab.GetComponentsInChildren<Collider>();
 
                 long endIdx = 0;
-                foreach (OldInstanceProvider.InstanceDetails details in instanceDetails) {
+                foreach (InstanceProvider.InstanceDetails details in instanceDetails) {
                     endIdx = details.GenerateDetails(allTransformDetails, endIdx);
                 }
 
@@ -105,9 +104,9 @@ namespace SKFX.WorldBuilder {
                     }
 
                     // Pause a little for a break and some coffee.
-                    if (endIdx % 100 == 0) {
-                        yield return null;
-                    }
+                    //if (endIdx % 100 == 0) {
+                    //    yield return null;
+                    //}
 
                     /*Matrix4x4 matrix = Matrix4x4.TRS(transformDetails.position, transformDetails.rotation, Vector3.one * transformDetails.uniformScale);
 
@@ -127,7 +126,7 @@ namespace SKFX.WorldBuilder {
                 }
 
                 // Another little break...
-                yield return null;
+                //yield return null;
             }
 
             if (combineInstances.Count > 0) {
@@ -140,6 +139,5 @@ namespace SKFX.WorldBuilder {
             }
 
         }
-#endif
     }
 }
