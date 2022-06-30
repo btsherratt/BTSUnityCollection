@@ -30,7 +30,8 @@ namespace SKFX.WorldBuilder {
                 }
             }
 
-            List<CombineInstance> combineInstances = new List<CombineInstance>();
+            //List<CombineInstance> combineInstances = new List<CombineInstance>();
+            Queue<CombineInstance> combineInstances = new Queue<CombineInstance>();
 
             GameObject host = new GameObject("__COLLISION_HOST");
 
@@ -73,7 +74,8 @@ namespace SKFX.WorldBuilder {
                                 CombineInstance combineInstance = new CombineInstance();
                                 combineInstance.mesh = cloneCollider.sharedMesh;
                                 combineInstance.transform = matrix;
-                                combineInstances.Add(combineInstance);
+                                combineInstances.Enqueue(combineInstance);
+                                //combineInstances.Add(combineInstance);
                             } else {
                                 GameObject newColliderHost = new GameObject("Host");
                                 newColliderHost.transform.SetParent(host.transform);
@@ -130,12 +132,26 @@ namespace SKFX.WorldBuilder {
             }
 
             if (combineInstances.Count > 0) {
-                Mesh collisionMesh = new Mesh();
-                collisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-                collisionMesh.CombineMeshes(combineInstances.ToArray(), true, true);
+                int remainingCount = combineInstances.Count;
+                while (remainingCount > 0) {
+                    int takeCount = Mathf.Min(remainingCount, 1024);
+                    CombineInstance[] instances = new CombineInstance[takeCount];
+                    for (int i = 0; i < takeCount; ++i) {
+                        instances[i] = combineInstances.Dequeue();
+                    }
+                    remainingCount -= takeCount;
 
-                MeshCollider collider = host.AddComponent<MeshCollider>();
-                collider.sharedMesh = collisionMesh;
+                    GameObject newColliderHost = new GameObject("Host");
+                    newColliderHost.transform.SetParent(host.transform);
+
+                    Mesh collisionMesh = new Mesh();
+                    collisionMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+
+                    collisionMesh.CombineMeshes(instances, true, true);
+
+                    MeshCollider collider = newColliderHost.AddComponent<MeshCollider>();
+                    collider.sharedMesh = collisionMesh;
+                }
             }
 
         }
