@@ -25,7 +25,10 @@ public class GroundedTransform : MonoBehaviour {
                     Quaternion rotation = transform.localRotation;
                     Vector3 angles = rotation.eulerAngles;
 
-                    Quaternion hitRotation = Quaternion.LookRotation(Vector3.forward, hit.normal);
+                    Vector3 right = Vector3.Cross(Vector3.forward, hit.normal);
+                    Vector3 forward = Vector3.Cross(right, hit.normal);
+
+                    Quaternion hitRotation = Quaternion.LookRotation(forward, hit.normal);
                     Vector3 hitAngles = hitRotation.eulerAngles;
 
                     Vector3 newAngles = Vector3.zero;
