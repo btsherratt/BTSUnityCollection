@@ -11,4 +11,11 @@ public static class ArrayExtensions {
         }
         return false;
     }
+
+    public static T[] CopyAdding<T>(this T[] array, T value) {
+        T[] copy = new T[array.Length + 1];
+        array.CopyTo(copy, 1);
+        copy[0] = value;
+        return copy;
+    }
 }
