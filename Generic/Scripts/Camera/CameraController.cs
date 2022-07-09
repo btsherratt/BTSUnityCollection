@@ -2,7 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class CameraController : MonoBehaviour {
+
     public interface ISource {
+        void SetupForCamera(Camera camera, bool transition);
     }
 
     public interface ISourceUpdating {
@@ -84,7 +86,8 @@ public class CameraController : MonoBehaviour {
         }
     }
 
-    public void PushControlSource(ISource source) {
+    public void PushControlSource(ISource source, bool transition) {
+        source.SetupForCamera(m_camera, transition);
         m_controlStack.Push(source);
     }
 
@@ -93,6 +96,13 @@ public class CameraController : MonoBehaviour {
             if (m_controlStack.Count == 0) {
                 break;
             }
+        }
+    }
+
+    public void PushAllControlSources(GameObject gameObject, bool transition) {
+        ISource[] cameraSources = gameObject.GetComponents<ISource>();
+        foreach (ISource source in cameraSources) {
+            PushControlSource(source, transition);
         }
     }
 }

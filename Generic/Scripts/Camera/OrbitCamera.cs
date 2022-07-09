@@ -16,8 +16,6 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
     [Layer]
     public int m_physicsLayer;
 
-    public CameraController m_cameraController;
-
     float m_angle = 0;
 
     PlayerInput m_playerInput;
@@ -31,7 +29,6 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
 
     public Quaternion GetCameraRotation(Camera camera) {
         return Quaternion.LookRotation(m_lookTarget.position - m_position, Vector3.up);
-        throw new System.NotImplementedException();
     }
 
     private void OnEnable() {
@@ -45,12 +42,15 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
         m_lookAction = m_playerInput.actions.FindAction("Look");
 
         m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
+    }
 
-        if (m_cameraController == null) {
-            m_cameraController = Camera.main.GetComponent<CameraController>();
+    public void SetupForCamera(Camera camera, bool transition) {
+        if (transition) {
+            Vector3 delta = m_followTarget.position - camera.transform.position;
+            float angle = Mathf.Atan2(delta.z, delta.z);
+            m_angle = Mathf.Rad2Deg * angle;
+            m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
         }
-
-        m_cameraController.PushControlSource(this);
     }
 
     public void UpdateForCamera(Camera camera) {

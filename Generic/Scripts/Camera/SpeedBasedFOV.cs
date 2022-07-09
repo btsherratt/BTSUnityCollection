@@ -26,8 +26,12 @@ public class SpeedBasedFOV : MonoBehaviour, CameraController.IFOVSource {
         m_speedProvider = m_trackingObject.GetComponent<ISpeedProviding>();
 
         m_currentFOV = m_minFOV;
+    }
 
-        Camera.main.GetComponent<CameraController>().PushControlSource(this);
+    public void SetupForCamera(Camera camera, bool transition) {
+        if (transition) {
+            m_currentFOV = camera.fieldOfView;
+        }
     }
 
     public float GetCameraFOV(Camera camera) {
