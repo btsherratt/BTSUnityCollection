@@ -19,16 +19,16 @@ public class SpeedBasedFOV : MonoBehaviour, CameraController.IFOVSource {
     ISpeedProviding m_speedProvider;
     float m_currentFOV;
 
-    void Start() {
+    public void SetupForCamera(Camera camera, bool transition) {
+        m_currentFOV = m_minFOV;
+
         if (m_trackingObject == null) {
             m_trackingObject = GameObject.FindGameObjectWithTag("Player");
         }
-        m_speedProvider = m_trackingObject.GetComponent<ISpeedProviding>();
+        if (m_speedProvider == null) {
+            m_speedProvider = m_trackingObject.GetComponent<ISpeedProviding>();
+        }
 
-        m_currentFOV = m_minFOV;
-    }
-
-    public void SetupForCamera(Camera camera, bool transition) {
         if (transition) {
             m_currentFOV = camera.fieldOfView;
         }

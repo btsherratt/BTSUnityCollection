@@ -47,8 +47,9 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
     public void SetupForCamera(Camera camera, bool transition) {
         if (transition) {
             Vector3 delta = m_followTarget.position - camera.transform.position;
-            float angle = Mathf.Atan2(delta.z, delta.z);
+            float angle = Mathf.Atan2(delta.z, delta.x);
             m_angle = Mathf.Rad2Deg * angle;
+            m_angle += 90.0f;
             m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
         }
     }
