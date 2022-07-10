@@ -91,10 +91,13 @@ public class CameraController : MonoBehaviour {
         m_controlStack.Push(source);
     }
 
-    public void PopControlSource(ISource source) {
-        while (m_controlStack.Pop() != source) {
-            if (m_controlStack.Count == 0) {
-                break;
+    public void PopControlSource(ISource source, bool transition) {
+        if (m_controlStack.Contains(source)) { // FIXME, this is pretty bad
+            while (m_controlStack.Pop() != source) {
+                if (m_controlStack.Count == 0) {
+                    break;
+                }
+                m_controlStack.Peek().SetupForCamera(m_camera, transition);
             }
         }
     }
@@ -103,6 +106,13 @@ public class CameraController : MonoBehaviour {
         ISource[] cameraSources = gameObject.GetComponents<ISource>();
         foreach (ISource source in cameraSources) {
             PushControlSource(source, transition);
+        }
+    }
+
+    public void PopAllControlSources(GameObject gameObject, bool transition) {
+        ISource[] cameraSources = gameObject.GetComponents<ISource>();
+        foreach (ISource source in cameraSources) {
+            PopControlSource(source, transition);
         }
     }
 }
