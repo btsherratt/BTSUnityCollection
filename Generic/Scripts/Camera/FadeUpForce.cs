@@ -5,7 +5,7 @@ public class FadeUpForce : MonoBehaviour, CameraController.IFadeSource {
     public bool m_fadeDown;
 
     void Start() {
-        Camera.main.GetComponent<CameraController>().PushControlSource(this, true);
+        Camera.main.GetComponent<CameraController>().PushControlSource(this, true, 0);
     }
 
     public void SetupForCamera(Camera camera, bool transition) {

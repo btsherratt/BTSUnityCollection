@@ -32,6 +32,13 @@ public class CameraController : MonoBehaviour {
     CameraFadeCurtain m_cameraFadeCurtain;
     Stack<ISource> m_controlStack = new Stack<ISource>();
 
+    public AnimationCurve m_transitionCurve;
+    Vector3 m_transitionStartPosition;
+    Quaternion m_transitionStartRotation;
+    float m_transitionStartTime;
+    float m_transitionDuration;
+    //public float m_transitionTime = 1.0f;
+
     void Start() {
         if (m_camera == null) {
             m_camera = GetComponent<Camera>();
@@ -54,7 +61,7 @@ public class CameraController : MonoBehaviour {
         foreach (ISource source in m_controlStack) {
             IPositionSource positionSource = source as IPositionSource;
             if (positionSource != null) {
-                m_camera.transform.position = positionSource.GetCameraPosition(m_camera);
+                ApplyPosition(positionSource.GetCameraPosition(m_camera));
                 break;
             }
         }
@@ -62,7 +69,7 @@ public class CameraController : MonoBehaviour {
         foreach (ISource source in m_controlStack) {
             IRotationSource rotationSource = source as IRotationSource;
             if (rotationSource != null) {
-                m_camera.transform.rotation = rotationSource.GetCameraRotation(m_camera);
+                ApplyRotation(rotationSource.GetCameraRotation(m_camera));
                 break;
             }
         }
@@ -86,12 +93,42 @@ public class CameraController : MonoBehaviour {
         }
     }
 
-    public void PushControlSource(ISource source, bool transition) {
+    void ApplyPosition(Vector3 position) {
+        Vector3 finalPosition = position;
+        if (m_transitionDuration > 0) {
+            float progress = Mathf.InverseLerp(m_transitionStartTime, m_transitionStartTime + m_transitionDuration, Time.time);
+            float t = m_transitionCurve.Evaluate(progress);
+            finalPosition = Vector3.Lerp(m_transitionStartPosition, position, t);
+        }
+        m_camera.transform.position = finalPosition;
+    }
+
+    void ApplyRotation(Quaternion rotation) {
+        Quaternion finalRotation = rotation;
+        if (m_transitionDuration > 0) {
+            float progress = Mathf.InverseLerp(m_transitionStartTime, m_transitionStartTime + m_transitionDuration, Time.time);
+            float t = m_transitionCurve.Evaluate(progress);
+            finalRotation = Quaternion.Lerp(m_transitionStartRotation, rotation, t);
+        }
+        m_camera.transform.rotation = finalRotation;
+    }
+
+    public void PushControlSource(ISource source, bool transition, float transitionTime) {
+        m_transitionStartPosition = m_camera.transform.position;
+        m_transitionStartRotation = m_camera.transform.rotation;
+        m_transitionStartTime = Time.time;
+        m_transitionDuration = transitionTime;
+
         source.SetupForCamera(m_camera, transition);
         m_controlStack.Push(source);
     }
 
-    public void PopControlSource(ISource source, bool transition) {
+    public void PopControlSource(ISource source, bool transition, float transitionTime) {
+        m_transitionStartPosition = m_camera.transform.position;
+        m_transitionStartRotation = m_camera.transform.rotation;
+        m_transitionStartTime = Time.time;
+        m_transitionDuration = transitionTime;
+
         if (m_controlStack.Contains(source)) { // FIXME, this is pretty bad
             while (m_controlStack.Pop() != source) {
                 if (m_controlStack.Count == 0) {
@@ -102,17 +139,17 @@ public class CameraController : MonoBehaviour {
         }
     }
 
-    public void PushAllControlSources(GameObject gameObject, bool transition) {
+    public void PushAllControlSources(GameObject gameObject, bool transition, float transitionTime) {
         ISource[] cameraSources = gameObject.GetComponents<ISource>();
         foreach (ISource source in cameraSources) {
-            PushControlSource(source, transition);
+            PushControlSource(source, transition, transitionTime);
         }
     }
 
-    public void PopAllControlSources(GameObject gameObject, bool transition) {
+    public void PopAllControlSources(GameObject gameObject, bool transition, float transitionTime) {
         ISource[] cameraSources = gameObject.GetComponents<ISource>();
         foreach (ISource source in cameraSources) {
-            PopControlSource(source, transition);
+            PopControlSource(source, transition, transitionTime);
         }
     }
 }

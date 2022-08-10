@@ -16,25 +16,39 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
     [Layer]
     public int m_physicsLayer;
 
-    //public float m_maxMetersPerSecond = 0.1f;
-    //public float m_maxDegreesPerSecond = 10.0f;
+    public float m_maxMetersPerSecond = 0.1f;
+    public float m_maxDegreesPerSecond = 10.0f;
 
-    float m_angle = 0;
+    public float m_angle = 0;
 
     PlayerInput m_playerInput;
     InputAction m_lookAction;
 
     Vector3 m_position;
-    
+
+    bool m_skipPositionSmoothing;
+    bool m_skipAngleSmoothing;
+
     public Vector3 GetCameraPosition(Camera camera) {
-        //Vector3 smoothed = Vector3.MoveTowards(camera.transform.position, m_position, m_maxMetersPerSecond);
-        return m_position;
+        if (m_skipPositionSmoothing) {
+            m_skipPositionSmoothing = false;
+            return m_position;
+        } else {
+            //Vector3 smoothed = Vector3.MoveTowards(camera.transform.position, m_position, m_maxMetersPerSecond);
+            return m_position;
+        }
     }
 
     public Quaternion GetCameraRotation(Camera camera) {
         Quaternion target = Quaternion.LookRotation(m_lookTarget.position - m_position, Vector3.up);
-        //Quaternion smoothed = Quaternion.RotateTowards(camera.transform.rotation, target, m_maxDegreesPerSecond);
-        return target;
+
+        if (m_skipAngleSmoothing) {
+            m_skipAngleSmoothing = false;
+            return target;
+        } else {
+            //Quaternion smoothed = Quaternion.RotateTowards(camera.transform.rotation, target, m_maxDegreesPerSecond);
+            return target;
+        }
     }
 
     private void OnEnable() {
@@ -51,12 +65,14 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
     }
 
     public void SetupForCamera(Camera camera, bool transition) {
-        if (transition) {
+        m_skipPositionSmoothing = !transition;
+        m_skipAngleSmoothing = !transition;
+        /*if (transition) {
             Vector3 delta = camera.transform.position - m_followTarget.position;
             float angle = Mathf.Atan2(delta.z, delta.x); //Mathf.Acos(Vector3.Dot(Vector3.forward, delta.XZ().normalized));
             m_angle = Mathf.Rad2Deg * angle;
             m_position = m_followTarget.position + Quaternion.Euler(0, m_angle, 0) * (Vector3.forward * m_distance);
-        }
+        }*/
     }
 
     public void UpdateForCamera(Camera camera) {
