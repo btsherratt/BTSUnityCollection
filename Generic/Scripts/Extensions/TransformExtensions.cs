@@ -27,4 +27,8 @@ public static class TransformExtensions {
             }
         }
     }
+
+    public static float Distance(this Transform transform, Transform comparisonTransform) {
+        return Vector3.Distance(transform.position, comparisonTransform.position);
+    }
 }
