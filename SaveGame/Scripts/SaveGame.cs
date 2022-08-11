@@ -125,26 +125,43 @@ public static class SaveGameSystem {
     public static void LoadGame(int slot) {
         string path = SaveGamePath(slot);
         string data = File.ReadAllText(path);
+
+        Debug.Log($"Loading from {path}");
+
         JSONNode saveDataJSON = JSONNode.Parse(data);
-        if (saveDataJSON[kMagicKey] == kMagicValue && saveDataJSON[kVersionKey] == kVersionValue) {
+        string magic = saveDataJSON[kMagicKey];
+        int version = saveDataJSON[kVersionKey];
+        if (magic == kMagicValue && version == kVersionValue) {
             JSONNode savedObjectDataJSON = saveDataJSON[kDataKey];
             if (savedObjectDataJSON != null) {
-                foreach (SaveGameObject saveGameObject in SaveGameObject.All()) {
-                    string objectKey = saveGameObject.m_saveGameObjectUUID;
+                foreach (string objectKey in savedObjectDataJSON.Keys) {
                     JSONNode savedObjectComponentsDataJSON = savedObjectDataJSON[objectKey];
-                    if (savedObjectComponentsDataJSON != null) {
+                    SaveGameObject saveGameObject = SaveGameObject.Find(objectKey);
+                    if (saveGameObject != null) {
                         foreach (ISaveGameDataProviding saveGameDataProvidingComponent in saveGameObject.GetComponents<ISaveGameDataProviding>()) {
                             string componentKey = saveGameDataProvidingComponent.SaveGameIdentifier;
                             JSONNode savedObjectComponentDataJSON = savedObjectComponentsDataJSON[componentKey];
                             if (savedObjectComponentDataJSON != null) {
                                 SaveGameData saveGameData = new SaveGameData(savedObjectComponentDataJSON);
                                 saveGameDataProvidingComponent.SaveGameApplySaveData(saveGameData); // Bad name...
+                                //Debug.Log($"{saveGameObject.name} :: ${componentKey} ${objectKey}");
+                            } else {
+                                Debug.Log($"Missing data for {componentKey}, this may not be a bug.");
                             }
                         }
+                    } else {
+                        Debug.LogError($"Unable to find save game object: path={path}, objectKey={objectKey}");
                     }
                 }
+            } else {
+                Debug.LogError($"Save object looks corrupted: path={path}");
             }
+        } else {
+            Debug.LogError($"Save format looks corrupted: path={path}, version={version}, magic={magic}");
         }
+
+        // NB: Not great here, but we don't want to keep doing this for every object...
+        Physics.SyncTransforms();
     }
 
     public static void SaveGame(int slot) {
@@ -167,6 +184,8 @@ public static class SaveGameSystem {
 
                     string componentKey = saveGameDataProvidingComponent.SaveGameIdentifier;
                     savedObjectComponentsDataJSON[componentKey] = savedObjectComponentDataJSON;
+
+                    //Debug.Log($"{saveGameObject.name} :: ${componentKey} ${saveGameObject.m_saveGameObjectUUID}");
                 }
             }
         }
