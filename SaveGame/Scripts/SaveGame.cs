@@ -162,6 +162,12 @@ public static class SaveGameSystem {
 
         // NB: Not great here, but we don't want to keep doing this for every object...
         Physics.SyncTransforms();
+
+        foreach (SaveGameObject saveGameObject in SaveGameObject.All()) {
+            foreach (ISaveGameListening saveGameListener in saveGameObject.GetComponents<ISaveGameListening>()) {
+                saveGameListener.SaveGameAppliedSaveData();
+            }
+        }
     }
 
     public static void SaveGame(int slot) {

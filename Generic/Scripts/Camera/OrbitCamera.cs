@@ -9,15 +9,15 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
 
     public float m_distance = 3.0f;
     public float m_anglePerSecond = 360.0f;
-    public float m_autoAnglePerSecond = 10.0f;
+    //public float m_autoAnglePerSecond = 10.0f;
 
     public bool m_invertedXControls = true;
 
     [Layer]
     public int m_physicsLayer;
 
-    public float m_maxMetersPerSecond = 0.1f;
-    public float m_maxDegreesPerSecond = 10.0f;
+    //public float m_maxMetersPerSecond = 0.1f;
+    //public float m_maxDegreesPerSecond = 10.0f;
 
     public float m_angle = 0;
 
@@ -80,6 +80,7 @@ public class OrbitCamera : MonoBehaviour, CameraController.ISourceUpdating, Came
         if (Mathf.Abs(lookDelta.x) >= float.Epsilon) {
             m_angle += (m_invertedXControls ? -lookDelta.x : lookDelta.x) * m_anglePerSecond * Time.deltaTime;
         } else {
+            //m_angle = Mathf.MoveTowardsAngle(m_angle, m_followTarget.transform.eulerAngles.y + 180, m_autoAnglePerSecond * Time.deltaTime);
             //m_angle = Mathf.MoveTowardsAngle(m_angle, m_followTarget.transform.eulerAngles.y + 180, m_autoAnglePerSecond * Time.deltaTime);
         }
 

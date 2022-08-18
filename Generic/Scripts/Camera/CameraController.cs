@@ -134,7 +134,9 @@ public class CameraController : MonoBehaviour {
                 if (m_controlStack.Count == 0) {
                     break;
                 }
-                m_controlStack.Peek().SetupForCamera(m_camera, transition);
+            }
+            foreach (ISource remainingSource in m_controlStack) {
+                remainingSource.SetupForCamera(m_camera, transition);
             }
         }
     }
