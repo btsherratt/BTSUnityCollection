@@ -9,6 +9,8 @@ public class SplineEditor : Editor {
 
     Spline targetSpline => target as Spline;
 
+    bool m_startedEdit;
+
     void OnSceneGUI() {
         /*if (targetSpline.controlPoints?.Length >= 3) {
             List<Vector3> points = new List<Vector3>();
@@ -29,6 +31,11 @@ public class SplineEditor : Editor {
             Handles.DrawLine(worldPoint + Vector3.left, worldPoint + Vector3.right);
         }*/
 
+        if (Event.current.type == EventType.MouseUp && m_startedEdit) {
+            targetSpline.SendUpdateEvent();
+            m_startedEdit = false;
+        }
+
         if (m_editing) {
 
             SerializedProperty pointsProperty = serializedObject.FindProperty("m_controlPoints");
@@ -41,6 +48,10 @@ public class SplineEditor : Editor {
                 EditorGUI.BeginChangeCheck();
 
                 Vector3 newWorldPoint = Handles.PositionHandle(worldPoint, Quaternion.identity);
+
+                if (worldPoint != newWorldPoint) {
+                    m_startedEdit = true;
+                }
 
                 if (EditorGUI.EndChangeCheck()) {
                     RaycastHit hit;

@@ -66,17 +66,17 @@ namespace SKFX.WorldBuilder {
 
         /*void OnAnyInstanceProviderChanged(OldInstanceProvider instanceProvider) {
             Cleanup();
-        }
+        }*/
 
         void OnAnyInstanceAreaChanged(InstanceArea instanceArea) {
             Cleanup();
-        }*/
+        }
 
         void OnEnable() {
-            /*InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
+            InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
             InstanceArea.ms_changeEvent += OnAnyInstanceAreaChanged;
 
-            OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
+            /*OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
             OldInstanceProvider.ms_changeEvent += OnAnyInstanceProviderChanged;*/
 
             Camera.onPreCull -= TryDraw;
@@ -84,7 +84,7 @@ namespace SKFX.WorldBuilder {
         }
 
         void OnDisable() {
-            //InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
+            InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
             //OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
             Camera.onPreCull -= TryDraw;
             Cleanup();

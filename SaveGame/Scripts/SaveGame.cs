@@ -8,8 +8,13 @@ public static class SaveGameSystem {
     class SaveGameData : ISaveGameDataReading, ISaveGameDataWriting {
         JSONNode m_jsonData;
 
-        public SaveGameData(JSONNode data = null) {
+        JSONNode m_parentNode;
+        string m_parentNodeKey;
+
+        public SaveGameData(JSONNode data = null, JSONNode parentNode = null, string parentNodeKey = null) {
             m_jsonData = data ?? new JSONObject();
+            m_parentNode = parentNode;
+            m_parentNodeKey = parentNodeKey;
         }
 
         public JSONNode ToJSONNode() {
@@ -76,6 +81,11 @@ public static class SaveGameSystem {
             }
         }
 
+        public ISaveGameDataReading ReadNestedGroup(string key) {
+            JSONNode dataNode = m_jsonData[key];
+            return new SaveGameData(dataNode, null, null);
+        }
+
         public void WriteBoolean(string key, bool value) {
             m_jsonData[key] = value;
         }
@@ -98,6 +108,16 @@ public static class SaveGameSystem {
 
         public void WriteQuaternion(string key, Quaternion value) {
             m_jsonData[key] = value;
+        }
+
+        public ISaveGameDataWriting WriteNestedGroup(string key) {
+            return new SaveGameData(null, m_jsonData, key);
+        }
+
+        public void Dispose() {
+            if (m_parentNode != null && m_parentNodeKey != null) {
+                m_parentNode[m_parentNodeKey] = m_jsonData;
+            }
         }
     }
 

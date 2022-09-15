@@ -283,6 +283,12 @@ public class Spline : MonoBehaviour {
     public delegate void SplineUpdateEvent(Spline spline);
     public static event SplineUpdateEvent ms_updateEvent;
 
+    public void SendUpdateEvent() {
+        if (ms_updateEvent != null) {
+            ms_updateEvent(this);
+        }
+    }
+
     public float Length => CachedSplineImpl().Length;
 
     SafeDisposable<SplineImpl> m_cachedSpline;
@@ -335,10 +341,6 @@ public class Spline : MonoBehaviour {
         if (m_cachedSpline != null) {
             m_cachedSpline.Dispose();
             m_cachedSpline = null;
-        }
-
-        if (ms_updateEvent != null) {
-            ms_updateEvent(this);
         }
     }
 
