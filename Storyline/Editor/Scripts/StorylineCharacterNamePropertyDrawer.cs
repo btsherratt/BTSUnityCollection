@@ -15,14 +15,11 @@ public class StorylineCharacterNamePropertyDrawer : PropertyDrawer {
             
             List<string> characterNames = new List<string>();
             characterNames.Add("<NONE>");
-            
-            for (int i = 0; i < storylineData.segments.Length; ++i) {
-                StorylineData.Segment segment = storylineData.segments[i];
-                if (characterNames.Contains(segment.characterName) == false) {
-                    characterNames.Add(segment.characterName);
-                    if (property.stringValue == segment.characterName) {
-                        selectionIdx = characterNames.Count - 1;
-                    }
+
+            foreach (string characterName in storylineData.CharacterNames()) {
+                characterNames.Add(characterName);
+                if (property.stringValue == characterName) {
+                    selectionIdx = characterNames.Count - 1;
                 }
             }
 

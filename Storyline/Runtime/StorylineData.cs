@@ -38,6 +38,7 @@ public class StorylineData : ScriptableObject {
         public string segmentUUID;
         public string characterName;
         public string[] variableNames;
+        public bool[] variableIsGameControlled;
         public VariableValue[] variableValues;
         public VariableChange[] variableChanges;
         public Sequence[] sequences;

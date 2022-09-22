@@ -56,6 +56,7 @@ public class ScriptSheetImporter : ScriptedImporter {
 
                 if (characterName != null) {
                     List<string> orderedVariableNames = new List<string>();
+                    List<bool> gameControlledVariables = new List<bool>();
                     Dictionary<string, int> variableNameByCol = new Dictionary<string, int>();
                     int greetingCol = -1;
                     int secondGreetingCol = -1;
@@ -79,6 +80,14 @@ public class ScriptSheetImporter : ScriptedImporter {
                             secondDialogueCol = col;
                         } else {
                             parameterName = parameterNameLower.Replace(" ", "_");
+
+                            if (parameterName.StartsWith('<') && parameterName.EndsWith('>')) {
+                                parameterName = parameterName.Trim('<', '>');
+                                gameControlledVariables.Add(true);
+                            } else {
+                                gameControlledVariables.Add(false);
+                            }
+
                             orderedVariableNames.Add(parameterName);
                             variableNameByCol[parameterName] = col;
                         }
@@ -98,6 +107,7 @@ public class ScriptSheetImporter : ScriptedImporter {
                             StorylineData.Segment segment = new StorylineData.Segment();
                             segment.characterName = characterName;
                             segment.variableNames = orderedVariableNames.ToArray();
+                            segment.variableIsGameControlled = gameControlledVariables.ToArray();
 
                             List<StorylineData.VariableValue> variableValues = new List<StorylineData.VariableValue>();
                             List<StorylineData.VariableChange> variableChanges = new List<StorylineData.VariableChange>();

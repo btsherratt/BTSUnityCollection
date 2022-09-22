@@ -7,6 +7,32 @@ public class Storyline {
     public struct State {
         public Dictionary<string, int> sequenceSeenCount;
         public Dictionary<string, bool> variableByName;
+
+        public override bool Equals(object obj) {
+            if (obj == null || GetType() != obj.GetType()) {
+                return false;
+            }
+
+            State otherState = (State)obj;
+
+        //    foreach (var pair in sequenceSeenCount) {
+        //        if (otherState.sequenceSeenCount[pair.Key] != pair.Value) {
+        //            return false;
+        //        }
+        //    }
+
+            foreach (var pair in variableByName) {
+                if (otherState.variableByName.TryGetValue(pair.Key, out bool value) && value != pair.Value) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override int GetHashCode() {
+            return sequenceSeenCount.GetHashCode() ^ variableByName.GetHashCode();
+        }
     }
 
     public struct SequenceEvent {
@@ -61,7 +87,21 @@ public class Storyline {
         }
     }
 
-    public IEnumerable<string> VariableNames() {
+    public IEnumerable<string> VariableNames(bool onlyIncludeGameControlled = false) {
+        List<string> variableNames = new List<string>();
+        foreach (StorylineData.Segment segment in m_data.segments) {
+            for (int i = 0; i < segment.variableNames.Length; ++i) {
+                string variableName = segment.variableNames[i];
+                bool gameControlled = segment.variableIsGameControlled[i];
+                if (variableNames.Contains(variableName) == false && (onlyIncludeGameControlled == false || gameControlled)) {
+                    yield return variableName;
+                    variableNames.Add(variableName);
+                }
+            }
+        }
+    }
+
+    public IEnumerable<string> GameChangedVariableNames() {
         List<string> variableNames = new List<string>();
         foreach (StorylineData.Segment segment in m_data.segments) {
             foreach (string variableName in segment.variableNames) {
