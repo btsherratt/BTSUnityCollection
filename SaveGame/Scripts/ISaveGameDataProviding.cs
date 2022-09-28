@@ -8,3 +8,7 @@ public interface ISaveGameDataProviding {
     void SaveGameApplySaveData(ISaveGameDataReading data);
     void SaveGameGatherSaveData(ISaveGameDataWriting data);
 }
+
+public interface IOrderedSaveGameDataProviding : ISaveGameDataProviding {
+    int SaveGameOrder { get; }
+}

@@ -154,23 +154,46 @@ public static class SaveGameSystem {
         if (magic == kMagicValue && version == kVersionValue) {
             JSONNode savedObjectDataJSON = saveDataJSON[kDataKey];
             if (savedObjectDataJSON != null) {
+                int minOrder = 0;
+                int maxOrder = 0;
+
                 foreach (string objectKey in savedObjectDataJSON.Keys) {
                     JSONNode savedObjectComponentsDataJSON = savedObjectDataJSON[objectKey];
                     SaveGameObject saveGameObject = SaveGameObject.Find(objectKey);
                     if (saveGameObject != null) {
-                        foreach (ISaveGameDataProviding saveGameDataProvidingComponent in saveGameObject.GetComponents<ISaveGameDataProviding>()) {
-                            string componentKey = saveGameDataProvidingComponent.SaveGameIdentifier;
-                            JSONNode savedObjectComponentDataJSON = savedObjectComponentsDataJSON[componentKey];
-                            if (savedObjectComponentDataJSON != null) {
-                                SaveGameData saveGameData = new SaveGameData(savedObjectComponentDataJSON);
-                                saveGameDataProvidingComponent.SaveGameApplySaveData(saveGameData); // Bad name...
-                                //Debug.Log($"{saveGameObject.name} :: ${componentKey} ${objectKey}");
-                            } else {
-                                Debug.Log($"Missing data for {componentKey}, this may not be a bug.");
-                            }
+                        foreach (IOrderedSaveGameDataProviding saveGameDataProvidingComponent in saveGameObject.GetComponents<IOrderedSaveGameDataProviding>()) {
+                            minOrder = Mathf.Min(minOrder, saveGameDataProvidingComponent.SaveGameOrder);
+                            maxOrder = Mathf.Max(maxOrder, saveGameDataProvidingComponent.SaveGameOrder);
                         }
                     } else {
                         Debug.LogError($"Unable to find save game object: path={path}, objectKey={objectKey}");
+                    }
+                }
+
+                for (int order = minOrder; order <= maxOrder; ++order) {
+                    foreach (string objectKey in savedObjectDataJSON.Keys) {
+                        JSONNode savedObjectComponentsDataJSON = savedObjectDataJSON[objectKey];
+                        SaveGameObject saveGameObject = SaveGameObject.Find(objectKey);
+                        if (saveGameObject != null) {
+                            foreach (ISaveGameDataProviding saveGameDataProvidingComponent in saveGameObject.GetComponents<ISaveGameDataProviding>()) {
+                                IOrderedSaveGameDataProviding orderedComponent = saveGameDataProvidingComponent as IOrderedSaveGameDataProviding;
+                                int matchOrder = orderedComponent != null ? orderedComponent.SaveGameOrder : 0;
+
+                                if (order == matchOrder) {
+                                    string componentKey = saveGameDataProvidingComponent.SaveGameIdentifier;
+                                    JSONNode savedObjectComponentDataJSON = savedObjectComponentsDataJSON[componentKey];
+                                    if (savedObjectComponentDataJSON != null) {
+                                        SaveGameData saveGameData = new SaveGameData(savedObjectComponentDataJSON);
+                                        saveGameDataProvidingComponent.SaveGameApplySaveData(saveGameData); // Bad name...
+                                                                                                            //Debug.Log($"{saveGameObject.name} :: ${componentKey} ${objectKey}");
+                                    } else {
+                                        Debug.Log($"Missing data for {componentKey}, this may not be a bug.");
+                                    }
+                                }
+                            }
+                        } else {
+                            Debug.LogError($"Unable to find save game object: path={path}, objectKey={objectKey}");
+                        }
                     }
                 }
             } else {
