@@ -7,6 +7,7 @@ public static class CoWait {
 
     public static IEnumerator Seconds(float time, TickCallback tickCallback = null) {
         float startTime = Time.time;
+        float lastTime = 0.0f;
         for (;;) {
             float currentTime = Time.time;
             float delta = currentTime - startTime;
@@ -15,8 +16,14 @@ public static class CoWait {
                 tickCallback(completion);
             }
             if (delta > time) {
+                if (lastTime != 1.0f && tickCallback != null) {
+                    yield return null;
+                    tickCallback(1.0f);
+                }
+                yield return null;
                 break;
             }
+            lastTime = delta;
             yield return null;
         }
     }
