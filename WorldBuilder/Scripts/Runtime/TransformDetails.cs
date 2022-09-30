@@ -1,13 +1,16 @@
 using System;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace SKFX.WorldBuilder {
-    [Serializable]
+    [StructLayout(LayoutKind.Sequential, Pack = 0)]
     public struct TransformDetails {
-        public const int Size = 2 * 4 * sizeof(float);
+        public const int Size = (3 * sizeof(float)) + (1 * sizeof(float)) + (4 * sizeof(float)) + (sizeof(int));
+
         public Vector3 position;
         public float uniformScale;
         public Quaternion rotation;
+        public int cullingBin;
     }
 
     public static class TransformDetailsExtensions {
@@ -16,6 +19,7 @@ namespace SKFX.WorldBuilder {
             transformDetails.position = transform.localPosition;
             transformDetails.rotation = transform.localRotation;
             transformDetails.uniformScale = Mathf.Min(transform.localScale.x, transform.localScale.y, transform.localScale.z);
+            transformDetails.cullingBin = 0;
             return transformDetails;
         }
 

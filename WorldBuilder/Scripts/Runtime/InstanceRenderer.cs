@@ -47,14 +47,23 @@ namespace SKFX.WorldBuilder {
         }*/
 
         public ComputeShader m_computeShader;
+        int m_kernel;
 
         [Layer]
         public int m_renderLayer;
 
         CommandBuffer m_commandBuffer;
 
+        BoundingSphere[] m_boundingSpheres;
+        CullingGroup m_cullingGroup;
+        public SafeDisposable<ComputeBuffer> m_cullingBinBuffer;
+
         List<DrawData> m_drawData;
         HashSet<Camera> m_cameras;
+
+        private void Awake() {
+            m_kernel = m_computeShader.FindKernel("Culling");
+        }
 
         private void OnApplicationQuit() {
             Cleanup();
@@ -93,30 +102,36 @@ namespace SKFX.WorldBuilder {
         void TryDraw(Camera camera) {
             if (camera != null && ((camera.cameraType == CameraType.Game && (camera.cullingMask & (1 << m_renderLayer)) > 0) || camera.cameraType == CameraType.SceneView)) {
                 Camera detailsCamera = (Application.isPlaying && camera.cameraType == CameraType.SceneView) ? Camera.main : camera;
+                if (detailsCamera != null) {
+                    Vector4 cameraDetails1 = detailsCamera.transform.position;
+                    Vector4 cameraDetails2 = new Vector4(detailsCamera.nearClipPlane, detailsCamera.farClipPlane, detailsCamera.fieldOfView * Mathf.Deg2Rad, QualitySettings.lodBias);
+                    Vector4 cameraDetails3 = detailsCamera.transform.forward;
+                    m_computeShader.SetVectorArray("_CameraDetails", new Vector4[] { cameraDetails1, cameraDetails2, cameraDetails3 });
 
-                Vector4 cameraDetails1 = detailsCamera.transform.position;
-                Vector4 cameraDetails2 = new Vector4(detailsCamera.nearClipPlane, detailsCamera.farClipPlane, detailsCamera.fieldOfView * Mathf.Deg2Rad, QualitySettings.lodBias);
-                Vector4 cameraDetails3 = detailsCamera.transform.forward;
-                m_computeShader.SetVectorArray("_CameraDetails", new Vector4[] { cameraDetails1, cameraDetails2, cameraDetails3 });
+                    if (m_commandBuffer == null) {
+                        Setup(detailsCamera);
+                    }
 
-                if (m_commandBuffer == null) {
-                    Setup();
-                }
+                    if (m_cameras == null) {
+                        m_cameras = new HashSet<Camera>();
+                    }
 
-                if (m_cameras == null) {
-                    m_cameras = new HashSet<Camera>();
-                }
+                    if (m_cameras.Contains(camera) == false) {
+                        camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, m_commandBuffer);
+                        m_cameras.Add(camera);
+                    }
 
-                if (m_cameras.Contains(camera) == false) {
-                    camera.AddCommandBuffer(CameraEvent.AfterForwardOpaque, m_commandBuffer);
-                    m_cameras.Add(camera);
+                    if (m_cullingGroup != null) {
+                        m_cullingGroup.targetCamera = detailsCamera;
+                    }
                 }
             }
         }
 
-        void Setup() {
-            GenerateDrawData();
+        void Setup(Camera camera) {
+            GenerateDrawData(camera);
             GenerateCommandBuffer();
+            UploadCullingData();
         }
 
         void Cleanup() {
@@ -124,7 +139,7 @@ namespace SKFX.WorldBuilder {
             CleanupCommandBuffer();
         }
 
-        void GenerateDrawData() {
+        void GenerateDrawData(Camera camera) {
             CleanupDrawData();
 
             m_drawData = new List<DrawData>();
@@ -144,7 +159,25 @@ namespace SKFX.WorldBuilder {
                         instanceDetails.Add(details);
                     }
                 }
- //           }
+//           }
+
+
+            //Bounds bounds = new Bounds(allInstanceDetails[0].position, Vector3.zero);
+            //for (int i = 1; i < (int)startIdx; ++i) {
+            //    bounds.Encapsulate(allInstanceDetails[i].position);
+            //}
+
+            const float CELL_SIZE = 100.0f;
+            //int width = Mathf.CeilToInt(bounds.size.x / CELL_SIZE);
+            //int depth = Mathf.CeilToInt(bounds.size.z / CELL_SIZE);
+
+            Dictionary<(int, int), int> worldSpace = new Dictionary<(int, int), int>();
+            List<List<Vector3>> worldSpacePoints = new List<List<Vector3>>();
+            //Dictionary<(int, int), List<int>> worldSpace = new Dictionary<(int, int), List<int>>();
+
+            //Bounds?[] boundingCollections = new Bounds?[width * depth];
+            //int sphereCount = 0;
+
 
             long totalInstances = 0;
             foreach (var pair in instanceDetailsByPrefabLOD) {
@@ -214,7 +247,22 @@ namespace SKFX.WorldBuilder {
                         }*/
                     }
 
-                    totalInstances += startIdx;
+                    for (int i = 0; i < (int)startIdx; ++i) {
+                        int cellX = Mathf.CeilToInt(allInstanceDetails[i].position.x / CELL_SIZE);
+                        int cellZ = Mathf.CeilToInt(allInstanceDetails[i].position.z / CELL_SIZE);
+
+                        if (worldSpace.TryGetValue((cellX, cellZ), out var listIdx)) {
+                            allInstanceDetails[i].cullingBin = listIdx;
+                            worldSpacePoints[listIdx].Add(allInstanceDetails[i].position);
+                        } else {
+                            listIdx = worldSpacePoints.Count;
+                            worldSpace[(cellX, cellZ)] = listIdx;
+                            worldSpacePoints.Add(new List<Vector3>());
+
+                            allInstanceDetails[i].cullingBin = listIdx;
+                            worldSpacePoints[listIdx].Add(allInstanceDetails[i].position);
+                        }
+                    }
 
                     if (startIdx > int.MaxValue) {
                         Debug.LogError("Too many values!!!");
@@ -244,6 +292,35 @@ namespace SKFX.WorldBuilder {
             }
 
             Debug.Log($"Generated {totalInstances} instances");
+
+
+            m_boundingSpheres = new BoundingSphere[worldSpace.Count];
+            foreach (var worldSpacePair in worldSpace) {
+                List<Vector3> points = worldSpacePoints[worldSpacePair.Value];
+
+                Bounds bounds = new Bounds(points[0], Vector3.zero);
+                foreach (Vector3 point in points) {
+                    bounds.Encapsulate(point);
+                }
+
+                m_boundingSpheres[worldSpacePair.Value] = new BoundingSphere(bounds.center, bounds.extents.magnitude);
+            }
+
+            // Dictionary<(int, int), int> worldSpace = new Dictionary<(int, int), int>();
+            // List<List<Vector3>> worldSpacePoints = new List<List<Vector3>>();
+
+            Debug.Assert(m_boundingSpheres.Length == m_boundingSpheres.LongLength);
+
+            m_cullingGroup = new CullingGroup();
+            m_cullingGroup.onStateChanged += OnCullingStateChanged;
+            m_cullingGroup.targetCamera = camera;
+            //m_cullingGroup.SetDistanceReferencePoint(camera.transform); // This is dumb
+            //m_cullingGroup.SetBoundingDistances(new float[] { float.PositiveInfinity });
+            m_cullingGroup.SetBoundingSpheres(m_boundingSpheres);
+            m_cullingGroup.SetBoundingSphereCount(m_boundingSpheres.Length);
+
+            m_cullingBinBuffer = new ComputeBuffer(m_boundingSpheres.Length, sizeof(int), ComputeBufferType.Structured, ComputeBufferMode.SubUpdates);
+
         }
 
         void CleanupDrawData() {
@@ -254,19 +331,29 @@ namespace SKFX.WorldBuilder {
                     drawData.matrixBuffer.Dispose();
                 }
                 m_drawData = null;
+
+                m_cullingGroup.Dispose();
+                m_cullingGroup = null;
+
+                m_cullingBinBuffer.Dispose();
+                m_cullingBinBuffer = null;
             }
         }
 
         void GenerateCommandBuffer() {
             CleanupCommandBuffer();
-
-            int kernel = m_computeShader.FindKernel("Culling");
-
             m_commandBuffer = new CommandBuffer();
+            AddCommandBufferValues();
+        }
+
+        void AddCommandBufferValues() {
+            m_commandBuffer.Clear();
 
             foreach (DrawData drawData in m_drawData) {
-                m_commandBuffer.SetComputeBufferParam(m_computeShader, kernel, "_Input", drawData.unculledDataBuffer);
-                m_commandBuffer.SetComputeBufferParam(m_computeShader, kernel, "_Output", drawData.matrixBuffer);
+                m_commandBuffer.SetComputeBufferParam(m_computeShader, m_kernel, "_CullingBins", m_cullingBinBuffer);
+
+                m_commandBuffer.SetComputeBufferParam(m_computeShader, m_kernel, "_Input", drawData.unculledDataBuffer);
+                m_commandBuffer.SetComputeBufferParam(m_computeShader, m_kernel, "_Output", drawData.matrixBuffer);
 
                 for (int i = 0; i < drawData.drawPairs.Length; ++i) {
                     DrawPair drawPair = drawData.drawPairs[i];
@@ -278,7 +365,7 @@ namespace SKFX.WorldBuilder {
                     m_commandBuffer.SetComputeMatrixParam(m_computeShader, "_MeshOffsetMatrix", drawPair.matrix);
 
                     m_commandBuffer.SetBufferCounterValue(drawData.matrixBuffer, 0);
-                    m_commandBuffer.DispatchCompute(m_computeShader, kernel, drawData.unculledDataBuffer.Value.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
+                    m_commandBuffer.DispatchCompute(m_computeShader, m_kernel, drawData.unculledDataBuffer.Value.count / KERNEL_SIZE, /*details.inputData.Length / 256*/1, 1);
 
                     m_commandBuffer.SetGlobalMatrix("_MeshOffsetMatrix", drawPair.matrix);
 
@@ -288,6 +375,28 @@ namespace SKFX.WorldBuilder {
                     m_commandBuffer.DrawMeshInstancedIndirect(drawPair.mesh, drawPair.submeshIndex, drawPair.material, 0/*m_instanceData.m_bounds*/, drawData.indirectArguments, argsOffset: i * 5 * sizeof(uint));
                 }
             }
+        }
+
+        void UploadCullingData() {
+            if (m_cullingBinBuffer.Value != null) {
+                var data = m_cullingBinBuffer.Value.BeginWrite<int>(0, m_boundingSpheres.Length);
+                for (int i = 0; i < m_boundingSpheres.Length; ++i) {
+                    data[i] = m_cullingGroup.IsVisible(i) ? 1 : 0;
+                }
+                m_cullingBinBuffer.Value.EndWrite<int>(m_boundingSpheres.Length);
+            }
+        }
+
+        void OnCullingStateChanged(CullingGroupEvent sphere) {
+            //UploadCullingData();
+
+            var data = m_cullingBinBuffer.Value.BeginWrite<int>(sphere.index, 1);
+            for (int i = 0; i < m_boundingSpheres.Length; ++i) {
+                data[0] = sphere.isVisible ? 1 : 0;
+            }
+            m_cullingBinBuffer.Value.EndWrite<int>(1);
+            
+            //AddCommandBufferValues();//???
         }
 
         void CleanupCommandBuffer() {
@@ -304,6 +413,17 @@ namespace SKFX.WorldBuilder {
             if (m_cameras != null) {
                 m_cameras.Clear();
             }
+        }
+
+        private void OnDrawGizmos() {
+            if (m_drawData != null) {
+                foreach (DrawData drawData in m_drawData) {
+                    foreach (BoundingSphere boundingSphere in m_boundingSpheres) {
+                        Gizmos.DrawWireSphere(boundingSphere.position, boundingSphere.radius);
+                    }
+                }
+            }
+            
         }
     }
 }
