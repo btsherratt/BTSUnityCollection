@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -28,23 +26,6 @@ namespace SKFX.WorldBuilder {
             public SafeDisposable<ComputeBuffer> indirectArguments;
             public SafeDisposable<ComputeBuffer> matrixBuffer;
         }
-
-        /*[StructLayout(LayoutKind.Explicit, Pack = 1, Size = InstanceDetails.Size)]
-        public struct InstanceDetails{
-            public const int Size = 3 * 4 * sizeof(float);
-
-            [FieldOffset(0 * sizeof(float))]
-            public Vector3 position;
-
-            [FieldOffset(3 * sizeof(float))]
-            public float uniformScale;
-
-            [FieldOffset(4 * sizeof(float))]
-            public Quaternion rotation;
-
-            [FieldOffset(8 * sizeof(float))]
-            public Vector4 instanceData;
-        }*/
 
         public ComputeShader m_computeShader;
         int m_kernel;
@@ -289,6 +270,8 @@ namespace SKFX.WorldBuilder {
 
                         m_drawData.Add(drawData);
                     }
+
+                    totalInstances += startIdx;
                 }
             }
 
@@ -416,7 +399,7 @@ namespace SKFX.WorldBuilder {
             }
         }
 
-        private void OnDrawGizmos() {
+        private void OnDrawGizmosSelected() {
             if (m_drawData != null) {
                 foreach (DrawData drawData in m_drawData) {
                     foreach (BoundingSphere boundingSphere in m_boundingSpheres) {
