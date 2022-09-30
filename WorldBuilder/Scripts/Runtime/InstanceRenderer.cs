@@ -121,8 +121,9 @@ namespace SKFX.WorldBuilder {
                         m_cameras.Add(camera);
                     }
 
-                    if (m_cullingGroup != null) {
+                    if (m_cullingGroup != null && m_cullingGroup.targetCamera != detailsCamera) {
                         m_cullingGroup.targetCamera = detailsCamera;
+                        UploadCullingData();
                     }
                 }
             }
