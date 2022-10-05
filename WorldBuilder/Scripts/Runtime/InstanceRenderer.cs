@@ -30,6 +30,7 @@ namespace SKFX.WorldBuilder {
         public ComputeShader m_computeShader;
         int m_kernel;
 
+
         [Layer]
         public int m_renderLayer;
 
@@ -38,6 +39,7 @@ namespace SKFX.WorldBuilder {
         BoundingSphere[] m_boundingSpheres;
         CullingGroup m_cullingGroup;
         public SafeDisposable<ComputeBuffer> m_cullingBinBuffer;
+        bool m_performFullCull;
 
         List<DrawData> m_drawData;
         HashSet<Camera> m_cameras;
@@ -69,14 +71,14 @@ namespace SKFX.WorldBuilder {
             /*OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
             OldInstanceProvider.ms_changeEvent += OnAnyInstanceProviderChanged;*/
 
-            Camera.onPreCull -= TryDraw;
-            Camera.onPreCull += TryDraw;
+            Camera.onPreRender -= TryDraw;
+            Camera.onPreRender += TryDraw;
         }
 
         void OnDisable() {
             InstanceArea.ms_changeEvent -= OnAnyInstanceAreaChanged;
             //OldInstanceProvider.ms_changeEvent -= OnAnyInstanceProviderChanged;
-            Camera.onPreCull -= TryDraw;
+            Camera.onPreRender -= TryDraw;
             Cleanup();
         }
 
@@ -88,6 +90,11 @@ namespace SKFX.WorldBuilder {
                     Vector4 cameraDetails2 = new Vector4(detailsCamera.nearClipPlane, detailsCamera.farClipPlane, detailsCamera.fieldOfView * Mathf.Deg2Rad, QualitySettings.lodBias);
                     Vector4 cameraDetails3 = detailsCamera.transform.forward;
                     m_computeShader.SetVectorArray("_CameraDetails", new Vector4[] { cameraDetails1, cameraDetails2, cameraDetails3 });
+
+                    if (m_performFullCull) {
+                        m_performFullCull = false;
+                        UploadCullingData();
+                    }
 
                     if (m_commandBuffer == null) {
                         Setup(detailsCamera);
@@ -104,7 +111,7 @@ namespace SKFX.WorldBuilder {
 
                     if (m_cullingGroup != null && m_cullingGroup.targetCamera != detailsCamera) {
                         m_cullingGroup.targetCamera = detailsCamera;
-                        UploadCullingData();
+                        m_performFullCull = true; // Try performing cull next frame
                     }
                 }
             }
