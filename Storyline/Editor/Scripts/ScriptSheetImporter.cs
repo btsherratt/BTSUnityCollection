@@ -20,7 +20,10 @@ public class ScriptSheetImporter : ScriptedImporter {
 
         string[] dialogueDataLines = dialogueData.Split("\n");
         foreach(string line in dialogueDataLines) {
-            if (line.StartsWith("<") && line.EndsWith(">")) {
+            if (line.StartsWith("//")) {
+                // Comment, do nothing...
+                //Debug.Log($"Skipping commented dialogue {line}");
+            } else if (line.StartsWith("<") && line.EndsWith(">")) {
                 StorylineData.SequenceEvent messageEvent = new StorylineData.SequenceEvent();
                 messageEvent.eventType = StorylineData.EventType.EventTypeMessage;
                 messageEvent.messageName = line.TrimStart('<').TrimEnd('>');
